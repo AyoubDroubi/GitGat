@@ -670,10 +670,10 @@ pub fn parse_worktrees(output: &str) -> Vec<WorktreeInfo> {
                 value.bare = true;
             } else if line == "detached" {
                 value.detached = true;
-            } else if line.is_empty() {
-                if let Some(previous) = current.take() {
-                    result.push(previous);
-                }
+            } else if line.is_empty()
+                && let Some(previous) = current.take()
+            {
+                result.push(previous);
             }
         }
     }
