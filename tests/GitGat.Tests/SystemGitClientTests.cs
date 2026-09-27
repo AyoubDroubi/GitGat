@@ -36,7 +36,7 @@ public sealed class SystemGitClientTests
         await client.CommitAsync(repository.Path, "update readme", cancellationToken);
         Assert.True((await client.GetStatusAsync(repository.Path, cancellationToken)).IsClean);
 
-        await client.CreateBranchAsync(repository.Path, "feature/test", checkout: true, cancellationToken);
+        await client.CreateBranchAsync(repository.Path, "feature/test", checkout: true, cancellationToken: cancellationToken);
         Assert.Equal("feature/test", (await client.GetStatusAsync(repository.Path, cancellationToken)).Branch);
 
         var history = await client.GetHistoryAsync(repository.Path, cancellationToken: cancellationToken);
