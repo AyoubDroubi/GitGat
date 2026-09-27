@@ -4,6 +4,12 @@
     <RootNamespace>GitGat.Desktop</RootNamespace>
     <AssemblyName>GitGat</AssemblyName>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <AssemblyTitle>GitGat</AssemblyTitle>
+    <Product>GitGat</Product>
+    <Company>GitGat</Company>
+    <Description>A calm, safe desktop Git workspace for teams.</Description>
+    <ApplicationIcon Condition="$([MSBuild]::IsOSPlatform('Windows'))">Assets\gitgat.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,5 +25,6 @@
     <PackageReference Include="SukiUI" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
-    <PackageReference Include="Serilog.Extensions.Hosting" />  </ItemGroup>
+    <PackageReference Include="Serilog.Extensions.Hosting" />
+  </ItemGroup>
 </Project>
