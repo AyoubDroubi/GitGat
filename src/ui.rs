@@ -444,28 +444,51 @@ impl GitGatApp {
 }
 
 impl eframe::App for GitGatApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx = ui.ctx().clone();
         ctx.set_visuals(egui::Visuals::dark());
-        self.handle_shortcuts(ctx);
-        let dropped=ctx.input(|i|i.raw.dropped_files.iter().find_map(|file|file.path.clone()));
-        if let Some(path)=dropped{self.open_repository(path);}
-        egui::TopBottomPanel::top("toolbar").show(ctx,|ui|self.toolbar(ui));
-        egui::TopBottomPanel::bottom("status").show(ctx,|ui|{
-            ui.horizontal_wrapped(|ui|{
-                ui.label(RichText::new(&self.notice).strong());
-                if !self.output_text.trim().is_empty(){ui.separator();ui.weak(self.output_text.lines().next().unwrap_or_default());}
-            });
+        self.handle_shortcuts(&ctx);
+
+        let dropped = ctx.input(|i| {
+            i.raw
+                .dropped_files
+                .iter()
+                .find_map(|file| file.path().map(Path::to_path_buf))
         });
-        egui::SidePanel::left("nav").resizable(false).default_width(170.0).show(ctx,|ui|self.sidebar(ui));
-        egui::CentralPanel::default().show(ctx,|ui|{
-            ScrollArea::vertical().auto_shrink([false,false]).show(ui,|ui|{
-                match self.tab{
-                    Tab::Overview=>self.overview(ui),Tab::Changes=>self.changes(ui),Tab::Branches=>self.branches(ui),
-                    Tab::History=>self.history(ui),Tab::PullRequests=>self.pull_requests(ui),Tab::Locks=>self.locks(ui),
-                    Tab::Actions=>self.actions(ui),Tab::MyWork=>self.my_work(ui),Tab::Workspaces=>self.workspaces(ui),
-                    Tab::Advanced=>self.advanced(ui),Tab::Settings=>self.settings(ui),
+        if let Some(path) = dropped {
+            self.open_repository(path);
+        }
+
+        egui::Panel::top("toolbar").show(ui, |ui| self.toolbar(ui));
+        egui::Panel::bottom("status").show(ui, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(RichText::new(&self.notice).strong());
+                if !self.output_text.trim().is_empty() {
+                    ui.separator();
+                    ui.weak(self.output_text.lines().next().unwrap_or_default());
                 }
             });
+        });
+        egui::Panel::left("nav")
+            .resizable(false)
+            .default_size(170.0)
+            .show(ui, |ui| self.sidebar(ui));
+        egui::CentralPanel::default().show(ui, |ui| {
+            ScrollArea::vertical()
+                .auto_shrink([false, false])
+                .show(ui, |ui| match self.tab {
+                    Tab::Overview => self.overview(ui),
+                    Tab::Changes => self.changes(ui),
+                    Tab::Branches => self.branches(ui),
+                    Tab::History => self.history(ui),
+                    Tab::PullRequests => self.pull_requests(ui),
+                    Tab::Locks => self.locks(ui),
+                    Tab::Actions => self.actions(ui),
+                    Tab::MyWork => self.my_work(ui),
+                    Tab::Workspaces => self.workspaces(ui),
+                    Tab::Advanced => self.advanced(ui),
+                    Tab::Settings => self.settings(ui),
+                });
         });
     }
 }
