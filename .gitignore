@@ -1,0 +1,27 @@
+## .NET
+bin/
+obj/
+artifacts/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## IDE
+.vs/
+.idea/
+.vscode/
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Local app data
+*.db
+*.db-shm
+*.db-wal
+logs/
+
+## Build/package output
+publish/
+*.nupkg
