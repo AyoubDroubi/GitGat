@@ -15,30 +15,31 @@ public sealed class SystemGitClientTests
         repository.Run("commit", "-m", "initial");
 
         var client = new SystemGitClient();
+        var cancellationToken = TestContext.Current.CancellationToken;
 
         repository.Write("README.md", "# GitGat\n\nChanged");
 
-        var changedStatus = await client.GetStatusAsync(repository.Path);
+        var changedStatus = await client.GetStatusAsync(repository.Path, cancellationToken);
         Assert.Equal(1, changedStatus.ChangedFiles);
         Assert.False(changedStatus.IsClean);
 
-        var changes = await client.GetChangesAsync(repository.Path);
+        var changes = await client.GetChangesAsync(repository.Path, cancellationToken);
         var readme = Assert.Single(changes);
         Assert.Equal("README.md", readme.Path);
         Assert.True(readme.IsUnstaged);
 
-        await client.StageAsync(repository.Path, ["README.md"]);
-        changes = await client.GetChangesAsync(repository.Path);
+        await client.StageAsync(repository.Path, ["README.md"], cancellationToken);
+        changes = await client.GetChangesAsync(repository.Path, cancellationToken);
         readme = Assert.Single(changes);
         Assert.True(readme.IsStaged);
 
-        await client.CommitAsync(repository.Path, "update readme");
-        Assert.True((await client.GetStatusAsync(repository.Path)).IsClean);
+        await client.CommitAsync(repository.Path, "update readme", cancellationToken);
+        Assert.True((await client.GetStatusAsync(repository.Path, cancellationToken)).IsClean);
 
-        await client.CreateBranchAsync(repository.Path, "feature/test", checkout: true);
-        Assert.Equal("feature/test", (await client.GetStatusAsync(repository.Path)).Branch);
+        await client.CreateBranchAsync(repository.Path, "feature/test", checkout: true, cancellationToken);
+        Assert.Equal("feature/test", (await client.GetStatusAsync(repository.Path, cancellationToken)).Branch);
 
-        var history = await client.GetHistoryAsync(repository.Path);
+        var history = await client.GetHistoryAsync(repository.Path, cancellationToken: cancellationToken);
         Assert.Contains(history, item => item.Subject == "update readme");
         Assert.Contains(history, item => item.Subject == "initial");
     }
@@ -54,9 +55,10 @@ public sealed class SystemGitClientTests
         repository.Write("file.txt", "dirty");
 
         var client = new SystemGitClient();
+        var cancellationToken = TestContext.Current.CancellationToken;
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => client.CheckoutBranchAsync(repository.Path, "other"));
+            () => client.CheckoutBranchAsync(repository.Path, "other", cancellationToken));
 
         Assert.Contains("Commit or stash", exception.Message);
     }
@@ -71,9 +73,10 @@ public sealed class SystemGitClientTests
         repository.Write("untracked.txt", "keep me");
 
         var client = new SystemGitClient();
+        var cancellationToken = TestContext.Current.CancellationToken;
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => client.DiscardTrackedAsync(repository.Path, "untracked.txt"));
+            () => client.DiscardTrackedAsync(repository.Path, "untracked.txt", cancellationToken));
 
         Assert.Contains("never discards untracked files", exception.Message);
         Assert.True(File.Exists(Path.Combine(repository.Path, "untracked.txt")));
