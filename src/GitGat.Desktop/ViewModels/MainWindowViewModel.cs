@@ -35,6 +35,8 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private WorkflowRunSummary? _selectedWorkflowRun;
     [ObservableProperty] private GitStash? _selectedStash;
     [ObservableProperty] private GitWorktree? _selectedWorktree;
+    [ObservableProperty] private GitReflogEntry? _selectedReflogEntry;
+    [ObservableProperty] private string? _selectedConflict;
     [ObservableProperty] private WorkspaceIdentity? _selectedWorkspace;
     [ObservableProperty] private string _diffText = "Select a changed file to inspect its diff.";
     [ObservableProperty] private string _commitDetailText = string.Empty;
@@ -55,6 +57,8 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private string _advancedConfirmation = string.Empty;
     [ObservableProperty] private string _worktreePath = string.Empty;
     [ObservableProperty] private string _worktreeBranch = string.Empty;
+    [ObservableProperty] private string _advancedTarget = string.Empty;
+    [ObservableProperty] private string _recoveryBranchName = string.Empty;
     [ObservableProperty] private string _statusSummary = "No repository selected.";
 
     public MainWindowViewModel(
@@ -498,6 +502,52 @@ public partial class MainWindowViewModel : ObservableObject
             });
 
     [RelayCommand]
+    private Task ResolveConflictOursAsync() =>
+        ResolveConflictAsync(GitConflictResolution.KeepOurs);
+
+    [RelayCommand]
+    private Task ResolveConflictTheirsAsync() =>
+        ResolveConflictAsync(GitConflictResolution.KeepTheirs);
+
+    [RelayCommand]
+    private Task MarkConflictResolvedAsync() =>
+        ActiveRepository is null || string.IsNullOrWhiteSpace(SelectedConflict)
+            ? Task.CompletedTask
+            : RunAsync("Marking conflict resolved…", async () =>
+            {
+                await _git.MarkConflictResolvedAsync(
+                    ActiveRepository.LocalPath,
+                    SelectedConflict);
+                await LoadActiveRepositoryAsync();
+            });
+
+    [RelayCommand]
+    private Task RebaseAsync() =>
+        RunAdvancedHistoryChangeAsync(
+            "Rebasing…",
+            $"REBASE {AdvancedTarget.Trim()}",
+            path => _git.RebaseAsync(path, AdvancedTarget.Trim()));
+
+    [RelayCommand]
+    private Task CherryPickAsync() =>
+        RunAdvancedHistoryChangeAsync(
+            "Cherry-picking…",
+            $"CHERRY-PICK {AdvancedTarget.Trim()}",
+            path => _git.CherryPickAsync(path, AdvancedTarget.Trim()));
+
+    [RelayCommand]
+    private Task ResetSoftAsync() =>
+        RunResetAsync(GitResetMode.Soft);
+
+    [RelayCommand]
+    private Task ResetMixedAsync() =>
+        RunResetAsync(GitResetMode.Mixed);
+
+    [RelayCommand]
+    private Task ResetHardAsync() =>
+        RunResetAsync(GitResetMode.Hard);
+
+    [RelayCommand]
     private Task StashAllAsync() =>
         ActiveRepository is null
             ? Task.CompletedTask
@@ -516,6 +566,46 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 await _git.StashApplyAsync(ActiveRepository.LocalPath, SelectedStash.Reference, false);
                 await LoadActiveRepositoryAsync();
+                await LoadAdvancedAsync();
+            });
+
+    [RelayCommand]
+    private Task PopStashAsync() =>
+        ActiveRepository is null || SelectedStash is null
+            ? Task.CompletedTask
+            : RunAsync("Popping stash…", async () =>
+            {
+                if (!string.Equals(AdvancedConfirmation.Trim(), SelectedStash.Reference, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        "Type the exact stash reference to confirm pop.");
+                }
+
+                await _git.StashApplyAsync(
+                    ActiveRepository.LocalPath,
+                    SelectedStash.Reference,
+                    true);
+                AdvancedConfirmation = string.Empty;
+                await LoadActiveRepositoryAsync();
+                await LoadAdvancedAsync();
+            });
+
+    [RelayCommand]
+    private Task DropStashAsync() =>
+        ActiveRepository is null || SelectedStash is null
+            ? Task.CompletedTask
+            : RunAsync("Dropping stash…", async () =>
+            {
+                if (!string.Equals(AdvancedConfirmation.Trim(), SelectedStash.Reference, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        "Type the exact stash reference to confirm drop.");
+                }
+
+                await _git.StashDropAsync(
+                    ActiveRepository.LocalPath,
+                    SelectedStash.Reference);
+                AdvancedConfirmation = string.Empty;
                 await LoadAdvancedAsync();
             });
 
@@ -550,6 +640,12 @@ public partial class MainWindowViewModel : ObservableObject
             });
 
     [RelayCommand]
+    private Task OpenWorktreeAsync() =>
+        SelectedWorktree is null
+            ? Task.CompletedTask
+            : OpenRepositoryAsync(SelectedWorktree.Path);
+
+    [RelayCommand]
     private Task RemoveWorktreeAsync() =>
         ActiveRepository is null || SelectedWorktree is null
             ? Task.CompletedTask
@@ -562,6 +658,27 @@ public partial class MainWindowViewModel : ObservableObject
 
                 await _git.RemoveWorktreeAsync(ActiveRepository.LocalPath, SelectedWorktree.Path);
                 AdvancedConfirmation = string.Empty;
+                await LoadAdvancedAsync();
+            });
+
+    [RelayCommand]
+    private Task CreateRecoveryBranchAsync() =>
+        ActiveRepository is null || SelectedReflogEntry is null
+            ? Task.CompletedTask
+            : RunAsync("Creating recovery branch…", async () =>
+            {
+                if (string.IsNullOrWhiteSpace(RecoveryBranchName))
+                {
+                    throw new InvalidOperationException("Recovery branch name is required.");
+                }
+
+                await _git.CreateRecoveryBranchAsync(
+                    ActiveRepository.LocalPath,
+                    SelectedReflogEntry.Sha,
+                    RecoveryBranchName.Trim());
+
+                RecoveryBranchName = string.Empty;
+                await LoadActiveRepositoryAsync();
                 await LoadAdvancedAsync();
             });
 
