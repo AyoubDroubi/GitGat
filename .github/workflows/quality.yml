@@ -10,9 +10,13 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    name: build
-    runs-on: windows-latest
+  verify:
+    name: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout
@@ -28,3 +32,9 @@ jobs:
 
       - name: Build
         run: dotnet build GitGat.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test GitGat.slnx --configuration Release --no-build
+
+      - name: Vulnerable package audit
+        run: dotnet list GitGat.slnx package --vulnerable --include-transitive

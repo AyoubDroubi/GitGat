@@ -5,4 +5,7 @@
     <Project Path="src/GitGat.Infrastructure/GitGat.Infrastructure.csproj" />
     <Project Path="src/GitGat.Desktop/GitGat.Desktop.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/GitGat.Tests/GitGat.Tests.csproj" />
+  </Folder>
 </Solution>
