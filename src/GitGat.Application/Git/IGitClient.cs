@@ -23,6 +23,12 @@ public interface IGitClient
     Task<IReadOnlyList<GitCommit>> GetHistoryAsync(string repositoryPath, int skip = 0, int take = 100, CancellationToken cancellationToken = default);
     Task<GitCommitDetail> GetCommitDetailAsync(string repositoryPath, string sha, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<string>> GetConflictsAsync(string repositoryPath, CancellationToken cancellationToken = default);
+    Task ResolveConflictAsync(string repositoryPath, string path, GitConflictResolution resolution, CancellationToken cancellationToken = default);
+    Task MarkConflictResolvedAsync(string repositoryPath, string path, CancellationToken cancellationToken = default);
+    Task RebaseAsync(string repositoryPath, string target, CancellationToken cancellationToken = default);
+    Task CherryPickAsync(string repositoryPath, string commit, CancellationToken cancellationToken = default);
+    Task ResetAsync(string repositoryPath, string target, GitResetMode mode, CancellationToken cancellationToken = default);
+    Task CreateRecoveryBranchAsync(string repositoryPath, string reference, string branchName, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<GitStash>> GetStashesAsync(string repositoryPath, CancellationToken cancellationToken = default);
     Task StashPushAsync(string repositoryPath, string? message, bool includeUntracked, CancellationToken cancellationToken = default);
     Task StashApplyAsync(string repositoryPath, string reference, bool pop, CancellationToken cancellationToken = default);
