@@ -242,13 +242,14 @@ public sealed class GitHubForgeClient : IForgeClient
             cancellationToken);
 
         using var document = JsonDocument.Parse(result);
-        var items = document.RootElement.ValueKind == JsonValueKind.Array
-            ? document.RootElement.EnumerateArray()
-            : [];
-
         var notifications = new List<ForgeNotification>();
 
-        foreach (var page in items)
+        if (document.RootElement.ValueKind != JsonValueKind.Array)
+        {
+            return notifications;
+        }
+
+        foreach (var page in document.RootElement.EnumerateArray())
         {
             if (page.ValueKind != JsonValueKind.Array)
             {
@@ -354,14 +355,16 @@ public sealed class GitHubForgeClient : IForgeClient
         }
         else if (OperatingSystem.IsMacOS())
         {
-            var escaped = command.Replace("\\", "\\\\", StringComparison.Ordinal)
-                .Replace(""", "\\"", StringComparison.Ordinal);
-            startInfo = new ProcessStartInfo(
-                "osascript",
-                $"-e \"tell application \\\"Terminal\\\" to do script \\\"{escaped}\\\"\"")
+            var escaped = command
+                .Replace("\\", "\\\\", StringComparison.Ordinal)
+                .Replace("\"", "\\\"", StringComparison.Ordinal);
+            var script = $"tell application \"Terminal\" to do script \"{escaped}\"";
+            startInfo = new ProcessStartInfo("osascript")
             {
-                UseShellExecute = true
+                UseShellExecute = false
             };
+            startInfo.ArgumentList.Add("-e");
+            startInfo.ArgumentList.Add(script);
         }
         else
         {
