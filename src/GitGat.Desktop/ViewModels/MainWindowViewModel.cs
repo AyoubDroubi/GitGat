@@ -918,6 +918,52 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    private Task ResolveConflictAsync(GitConflictResolution resolution) =>
+        ActiveRepository is null || string.IsNullOrWhiteSpace(SelectedConflict)
+            ? Task.CompletedTask
+            : RunAsync("Resolving conflict…", async () =>
+            {
+                await _git.ResolveConflictAsync(
+                    ActiveRepository.LocalPath,
+                    SelectedConflict,
+                    resolution);
+                await LoadActiveRepositoryAsync();
+            });
+
+    private Task RunResetAsync(GitResetMode mode) =>
+        RunAdvancedHistoryChangeAsync(
+            $"Resetting ({mode})…",
+            $"RESET {mode.ToString().ToUpperInvariant()} {AdvancedTarget.Trim()}",
+            path => _git.ResetAsync(path, AdvancedTarget.Trim(), mode));
+
+    private Task RunAdvancedHistoryChangeAsync(
+        string activity,
+        string confirmation,
+        Func<string, Task> action) =>
+        ActiveRepository is null
+            ? Task.CompletedTask
+            : RunAsync(activity, async () =>
+            {
+                if (string.IsNullOrWhiteSpace(AdvancedTarget))
+                {
+                    throw new InvalidOperationException("A target commit or reference is required.");
+                }
+
+                if (!string.Equals(
+                        AdvancedConfirmation.Trim(),
+                        confirmation,
+                        StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        $"Type '{confirmation}' exactly to confirm this history-changing operation.");
+                }
+
+                await action(ActiveRepository.LocalPath);
+                AdvancedConfirmation = string.Empty;
+                await LoadActiveRepositoryAsync();
+                await LoadAdvancedAsync();
+            });
+
     private Task ReviewPullRequestAsync(PullRequestReviewAction action) =>
         SelectedPullRequest is null
             ? Task.CompletedTask
