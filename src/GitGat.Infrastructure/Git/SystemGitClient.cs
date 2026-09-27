@@ -356,6 +356,188 @@ public sealed partial class SystemGitClient : IGitClient
             .ToArray();
     }
 
+    public async Task ResolveConflictAsync(
+        string repositoryPath,
+        string path,
+        GitConflictResolution resolution,
+        CancellationToken cancellationToken = default)
+    {
+        var conflicts = await GetConflictsAsync(repositoryPath, cancellationToken);
+        if (!conflicts.Contains(path, StringComparer.Ordinal))
+        {
+            throw new InvalidOperationException("The selected file is not currently conflicted.");
+        }
+
+        var option = resolution == GitConflictResolution.KeepOurs ? "--ours" : "--theirs";
+        await JournalAsync(
+            repositoryPath,
+            "resolve-conflict",
+            $"{path} using {resolution}",
+            false,
+            cancellationToken);
+
+        EnsureSuccess(await _runner.RunAsync(
+            repositoryPath,
+            ["checkout", option, "--", path],
+            cancellationToken));
+
+        EnsureSuccess(await _runner.RunAsync(
+            repositoryPath,
+            ["add", "--", path],
+            cancellationToken));
+    }
+
+    public async Task MarkConflictResolvedAsync(
+        string repositoryPath,
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        var conflicts = await GetConflictsAsync(repositoryPath, cancellationToken);
+        if (!conflicts.Contains(path, StringComparer.Ordinal))
+        {
+            throw new InvalidOperationException("The selected file is not currently conflicted.");
+        }
+
+        var fullPath = Path.GetFullPath(Path.Combine(repositoryPath, path));
+        var root = Path.GetFullPath(repositoryPath) + Path.DirectorySeparatorChar;
+        if (!fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Conflict path escapes the repository root.");
+        }
+
+        if (File.Exists(fullPath))
+        {
+            var info = new FileInfo(fullPath);
+            if (info.Length > 5 * 1024 * 1024)
+            {
+                throw new InvalidOperationException(
+                    "Large conflicted files must be resolved with Keep ours/Keep theirs or staged explicitly after external verification.");
+            }
+
+            var text = await File.ReadAllTextAsync(fullPath, cancellationToken);
+            var hasMarkers = text
+                .Split(['\r', '\n'], StringSplitOptions.None)
+                .Any(line =>
+                    line.StartsWith("<<<<<<<", StringComparison.Ordinal) ||
+                    line.StartsWith(">>>>>>>", StringComparison.Ordinal) ||
+                    string.Equals(line.Trim(), "=======", StringComparison.Ordinal));
+
+            if (hasMarkers)
+            {
+                throw new InvalidOperationException(
+                    "Conflict markers are still present. Resolve them before marking the file resolved.");
+            }
+        }
+
+        await JournalAsync(repositoryPath, "mark-conflict-resolved", path, false, cancellationToken);
+        EnsureSuccess(await _runner.RunAsync(repositoryPath, ["add", "--", path], cancellationToken));
+    }
+
+    public async Task RebaseAsync(
+        string repositoryPath,
+        string target,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureCleanForHistoryChangeAsync(repositoryPath, cancellationToken);
+        await VerifyCommitAsync(repositoryPath, target, cancellationToken);
+        var head = await GetHeadAsync(repositoryPath, cancellationToken);
+
+        await JournalAsync(
+            repositoryPath,
+            "rebase",
+            $"from {head} onto {target}",
+            true,
+            cancellationToken);
+
+        EnsureSuccess(await _runner.RunAsync(repositoryPath, ["rebase", target], cancellationToken));
+    }
+
+    public async Task CherryPickAsync(
+        string repositoryPath,
+        string commit,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureCleanForHistoryChangeAsync(repositoryPath, cancellationToken);
+        await VerifyCommitAsync(repositoryPath, commit, cancellationToken);
+        var head = await GetHeadAsync(repositoryPath, cancellationToken);
+
+        await JournalAsync(
+            repositoryPath,
+            "cherry-pick",
+            $"from {head}; commit {commit}",
+            true,
+            cancellationToken);
+
+        EnsureSuccess(await _runner.RunAsync(repositoryPath, ["cherry-pick", commit], cancellationToken));
+    }
+
+    public async Task ResetAsync(
+        string repositoryPath,
+        string target,
+        GitResetMode mode,
+        CancellationToken cancellationToken = default)
+    {
+        var status = await GetStatusAsync(repositoryPath, cancellationToken);
+        if (status.Operation is not null)
+        {
+            throw new InvalidOperationException(
+                "Finish or abort the current Git operation before resetting.");
+        }
+
+        if (mode == GitResetMode.Hard && !status.IsClean)
+        {
+            throw new InvalidOperationException(
+                "Hard reset is blocked while the working tree is dirty. Commit or stash first.");
+        }
+
+        await VerifyCommitAsync(repositoryPath, target, cancellationToken);
+        var head = await GetHeadAsync(repositoryPath, cancellationToken);
+        var modeArgument = mode switch
+        {
+            GitResetMode.Soft => "--soft",
+            GitResetMode.Mixed => "--mixed",
+            GitResetMode.Hard => "--hard",
+            _ => throw new ArgumentOutOfRangeException(nameof(mode))
+        };
+
+        await JournalAsync(
+            repositoryPath,
+            "reset",
+            $"{mode} from {head} to {target}",
+            true,
+            cancellationToken);
+
+        EnsureSuccess(await _runner.RunAsync(
+            repositoryPath,
+            ["reset", modeArgument, target],
+            cancellationToken));
+    }
+
+    public async Task CreateRecoveryBranchAsync(
+        string repositoryPath,
+        string reference,
+        string branchName,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureSuccess(await _runner.RunAsync(
+            repositoryPath,
+            ["check-ref-format", "--branch", branchName],
+            cancellationToken));
+        await VerifyCommitAsync(repositoryPath, reference, cancellationToken);
+
+        await JournalAsync(
+            repositoryPath,
+            "recovery-branch",
+            $"{branchName} from {reference}",
+            false,
+            cancellationToken);
+
+        EnsureSuccess(await _runner.RunAsync(
+            repositoryPath,
+            ["branch", branchName, reference],
+            cancellationToken));
+    }
+
     public async Task<IReadOnlyList<GitStash>> GetStashesAsync(
         string repositoryPath,
         CancellationToken cancellationToken = default)
@@ -553,6 +735,13 @@ public sealed partial class SystemGitClient : IGitClient
         {
             await JournalAsync(repositoryPath, "cherry-pick-abort", "abort in-progress cherry-pick", false, cancellationToken);
             EnsureSuccess(await _runner.RunAsync(repositoryPath, ["cherry-pick", "--abort"], cancellationToken));
+            return;
+        }
+
+        if (File.Exists(Path.Combine(gitDirectory, "REVERT_HEAD")))
+        {
+            await JournalAsync(repositoryPath, "revert-abort", "abort in-progress revert", false, cancellationToken);
+            EnsureSuccess(await _runner.RunAsync(repositoryPath, ["revert", "--abort"], cancellationToken));
             return;
         }
 
