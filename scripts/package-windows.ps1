@@ -41,10 +41,27 @@ if (-not (Test-Path $installerExe)) {
 }
 
 $installRoot = Join-Path $env:TEMP ("GitGat-Smoke-" + [guid]::NewGuid().ToString("N"))
-& $installerExe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART "/DIR=$installRoot"
+$installLog = Join-Path $env:TEMP ("GitGat-Install-" + [guid]::NewGuid().ToString("N") + ".log")
+$installProcess = Start-Process -FilePath $installerExe -ArgumentList @(
+    "/VERYSILENT",
+    "/SUPPRESSMSGBOXES",
+    "/NORESTART",
+    "/SP-",
+    "/DIR=$installRoot",
+    "/LOG=$installLog"
+) -Wait -PassThru
+if ($installProcess.ExitCode -ne 0) {
+    if (Test-Path $installLog) {
+        Get-Content $installLog | Write-Host
+    }
+    throw "Silent installer exited with code $($installProcess.ExitCode)"
+}
 
 $installedExe = Join-Path $installRoot "GitGat.exe"
 if (-not (Test-Path $installedExe)) {
+    if (Test-Path $installLog) {
+        Get-Content $installLog | Write-Host
+    }
     throw "Silent install did not produce GitGat.exe"
 }
 & $installedExe --self-check
@@ -53,11 +70,18 @@ $uninstaller = Join-Path $installRoot "unins000.exe"
 if (-not (Test-Path $uninstaller)) {
     throw "Uninstaller was not created."
 }
-& $uninstaller /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
-Start-Sleep -Seconds 2
+$uninstallProcess = Start-Process -FilePath $uninstaller -ArgumentList @(
+    "/VERYSILENT",
+    "/SUPPRESSMSGBOXES",
+    "/NORESTART"
+) -Wait -PassThru
+if ($uninstallProcess.ExitCode -ne 0) {
+    throw "Silent uninstaller exited with code $($uninstallProcess.ExitCode)"
+}
 if (Test-Path $installedExe) {
     throw "Silent uninstall did not remove GitGat.exe"
 }
+Remove-Item $installLog -Force -ErrorAction SilentlyContinue
 
 $portableHash = (Get-FileHash $portableExe -Algorithm SHA256).Hash.ToLowerInvariant()
 $installerHash = (Get-FileHash $installerExe -Algorithm SHA256).Hash.ToLowerInvariant()
