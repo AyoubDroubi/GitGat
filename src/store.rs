@@ -243,4 +243,25 @@ mod tests {
         let workspaces = catalog.workspaces().unwrap();
         assert_eq!(workspaces[0].repositories.len(), 1);
     }
+
+    #[test]
+    fn relocates_missing_repository_and_workspace_membership() {
+        let root = tempdir().unwrap();
+        let old = root.path().join("old-repo");
+        let new = root.path().join("new-repo");
+        std::fs::create_dir_all(&old).unwrap();
+        let catalog = Catalog::open(root.path().join("catalog.db")).unwrap();
+        catalog.touch_repository(&old).unwrap();
+        let workspace = catalog.create_workspace("Moved").unwrap();
+        catalog.add_to_workspace(workspace, &old).unwrap();
+
+        std::fs::rename(&old, &new).unwrap();
+        catalog.relocate_repository(&old, &new).unwrap();
+
+        let repositories = catalog.repositories().unwrap();
+        assert_eq!(repositories.len(), 1);
+        assert_eq!(repositories[0].path, new.canonicalize().unwrap());
+        let workspaces = catalog.workspaces().unwrap();
+        assert_eq!(workspaces[0].repositories, vec![new.canonicalize().unwrap()]);
+    }
 }
