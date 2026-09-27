@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/GitGat.Domain/GitGat.Domain.csproj" />
+    <Project Path="src/GitGat.Application/GitGat.Application.csproj" />
+    <Project Path="src/GitGat.Infrastructure/GitGat.Infrastructure.csproj" />
+    <Project Path="src/GitGat.Desktop/GitGat.Desktop.csproj" />
+  </Folder>
+</Solution>

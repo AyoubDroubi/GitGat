@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>GitGat.Application</RootNamespace>
+    <AssemblyName>GitGat.Application</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../GitGat.Domain/GitGat.Domain.csproj" />
+  </ItemGroup>
+</Project>
