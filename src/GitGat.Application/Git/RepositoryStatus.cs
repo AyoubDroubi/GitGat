@@ -5,7 +5,10 @@ public sealed record RepositoryStatus(
     int ChangedFiles,
     int UntrackedFiles,
     int Ahead,
-    int Behind)
+    int Behind,
+    string? Upstream = null,
+    bool HasConflicts = false,
+    string? Operation = null)
 {
-    public bool IsClean => ChangedFiles == 0 && UntrackedFiles == 0;
+    public bool IsClean => ChangedFiles == 0 && UntrackedFiles == 0 && !HasConflicts;
 }
