@@ -28,7 +28,7 @@ $portableExe = Join-Path $portable "GitGat.exe"
 Copy-Item $builtExe $portableExe
 & $portableExe --self-check
 
-$iscc = Join-Path \${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
+$iscc = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
 if (-not (Test-Path $iscc)) {
     throw "Inno Setup compiler not found: $iscc"
 }
