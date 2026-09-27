@@ -1,0 +1,71 @@
+name: package-windows-rust
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to package
+        required: false
+        default: 0.1.0
+  push:
+    branches: [main]
+    tags: ["v*"]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "src/**"
+      - "packaging/windows/**"
+      - "scripts/package-windows.ps1"
+      - ".github/workflows/package-windows.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        shell: pwsh
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal
+          rustup default 1.98.1
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          $iscc = Join-Path \${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup --yes --no-progress
+          }
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $version = "\${{ github.event.inputs.version }}"
+          if ([string]::IsNullOrWhiteSpace($version)) {
+            if ("\${{ github.ref_type }}" -eq "tag") {
+              $version = "\${{ github.ref_name }}".TrimStart("v")
+            } else {
+              $version = "0.1.0"
+            }
+          }
+          "value=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Build, verify and package
+        shell: pwsh
+        run: ./scripts/package-windows.ps1 -Version "\${{ steps.version.outputs.value }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GitGat-\${{ steps.version.outputs.value }}-win-x64
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            dist/portable/GitGat.exe
+            dist/installer/GitGat-Setup-x64.exe
+            dist/checksums/SHA256SUMS.txt
