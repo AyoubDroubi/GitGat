@@ -330,7 +330,7 @@
                 <TabItem Header="History">
                     <Grid Margin="4,14" ColumnDefinitions="420,*" ColumnSpacing="14">
                         <Border Classes="card">
-                            <Grid RowDefinitions="Auto,*">
+                            <Grid RowDefinitions="Auto,*,Auto">
                                 <TextBlock Classes="h2" Text="Recent commits" />
                                 <ListBox Grid.Row="1" Margin="0,10,0,0" ItemsSource="{Binding History}" SelectedItem="{Binding SelectedCommit, Mode=TwoWay}">
                                     <ListBox.ItemTemplate>
