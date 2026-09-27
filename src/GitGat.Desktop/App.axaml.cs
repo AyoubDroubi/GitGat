@@ -12,7 +12,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace GitGat.Desktop;
 
-public partial class App : Application
+public partial class App : Avalonia.Application
 {
     private IHost? _host;
 
