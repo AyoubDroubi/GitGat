@@ -14,3 +14,13 @@ GitGat is a modern, cross-platform desktop Git workspace focused on making Git u
 - SQLite + EF Core for local application state
 
 Development starts from feature branches. The `main` branch remains the integration baseline.
+
+## Product change tracking
+
+GitGat uses the repository-native governance system under [docs/to-do](docs/to-do/README.md).
+
+- [Global TODO index](docs/to-do/INDEX.md)
+- [Master implementation plan](docs/to-do/MASTER-PLAN.md)
+- [Operational activity ledger](docs/to-do/operations/ACTIVITY-LEDGER.md)
+
+Normal development targets `main`. Release/stable branch actions are handled separately only when explicitly authorized.

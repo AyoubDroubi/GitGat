@@ -35,3 +35,12 @@ Added the Operational Audit Layer:
 - mandatory timestamps/timezones and operational evidence when available;
 - failed attempts, retries and rollbacks remain visible;
 - rule to log state-changing operations/material verification without flooding history with harmless read-only commands.
+
+## 2026-09-27 — GitGat adoption
+
+- Installed the complete Product Change Tracking System from the ME governance reference.
+- Added the Operational Audit Layer and per-TODO operational logs.
+- Added repository guardrails: normal development stays on `main`; `production` is reserved and cannot be changed without explicit user authorization.
+- Reconstructed the already-merged desktop foundation as TODO-001 without inventing missing review evidence.
+- Captured TODO-002 through TODO-013 as the ordered product roadmap.
+- Added a master plan ending at verified Windows `GitGat.exe` and `GitGat-Setup-x64.exe` artifacts.
