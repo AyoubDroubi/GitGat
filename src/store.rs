@@ -22,7 +22,9 @@ impl Catalog {
     }
 
     pub fn open(path: impl Into<PathBuf>) -> Result<Self> {
-        let catalog = Self { db_path: path.into() };
+        let catalog = Self {
+            db_path: path.into(),
+        };
         catalog.migrate()?;
         Ok(catalog)
     }
@@ -81,9 +83,8 @@ impl Catalog {
 
     pub fn repositories(&self) -> Result<Vec<CatalogRepository>> {
         let connection = self.connection()?;
-        let mut statement = connection.prepare(
-            "SELECT path,name,favorite,last_opened_unix FROM repositories",
-        )?;
+        let mut statement =
+            connection.prepare("SELECT path,name,favorite,last_opened_unix FROM repositories")?;
         let rows = statement.query_map([], |row| {
             Ok(CatalogRepository {
                 path: PathBuf::from(row.get::<_, String>(0)?),
@@ -165,7 +166,9 @@ impl Catalog {
         let connection = self.connection()?;
         let mut statement = connection.prepare("SELECT id,name FROM workspaces ORDER BY name")?;
         let bases = statement
-            .query_map([], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)))?
+            .query_map([], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+            })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
 
         let mut result = Vec::with_capacity(bases.len());
@@ -174,9 +177,15 @@ impl Catalog {
                 "SELECT repository_path FROM workspace_repositories WHERE workspace_id=?1 ORDER BY repository_path",
             )?;
             let repositories = repos_statement
-                .query_map(params![id], |row| Ok(PathBuf::from(row.get::<_, String>(0)?)))?
+                .query_map(params![id], |row| {
+                    Ok(PathBuf::from(row.get::<_, String>(0)?))
+                })?
                 .collect::<rusqlite::Result<Vec<_>>>()?;
-            result.push(Workspace { id, name, repositories });
+            result.push(Workspace {
+                id,
+                name,
+                repositories,
+            });
         }
         Ok(result)
     }
@@ -227,7 +236,10 @@ fn data_home() -> PathBuf {
         return PathBuf::from(path).join("gitgat");
     }
     if let Some(path) = std::env::var_os("HOME") {
-        return PathBuf::from(path).join(".local").join("share").join("gitgat");
+        return PathBuf::from(path)
+            .join(".local")
+            .join("share")
+            .join("gitgat");
     }
     std::env::temp_dir().join("gitgat")
 }
@@ -273,6 +285,9 @@ mod tests {
         assert_eq!(repositories.len(), 1);
         assert_eq!(repositories[0].path, new.canonicalize().unwrap());
         let workspaces = catalog.workspaces().unwrap();
-        assert_eq!(workspaces[0].repositories, vec![new.canonicalize().unwrap()]);
+        assert_eq!(
+            workspaces[0].repositories,
+            vec![new.canonicalize().unwrap()]
+        );
     }
 }
