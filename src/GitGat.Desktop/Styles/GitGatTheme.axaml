@@ -1,0 +1,47 @@
+<Styles
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Styles.Resources>
+        <SolidColorBrush x:Key="GitGatBackgroundBrush" Color="#0C1015" />
+        <SolidColorBrush x:Key="GitGatSidebarBrush" Color="#10161D" />
+        <SolidColorBrush x:Key="GitGatSurfaceBrush" Color="#141B23" />
+        <SolidColorBrush x:Key="GitGatSurfaceRaisedBrush" Color="#18212B" />
+        <SolidColorBrush x:Key="GitGatBorderBrush" Color="#26313D" />
+        <SolidColorBrush x:Key="GitGatTextBrush" Color="#F4F7FA" />
+        <SolidColorBrush x:Key="GitGatMutedBrush" Color="#8F9CAA" />
+        <SolidColorBrush x:Key="GitGatAccentBrush" Color="#68D7C5" />
+    </Styles.Resources>
+
+    <Style Selector="TextBlock">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{DynamicResource GitGatTextBrush}" />
+    </Style>
+
+    <Style Selector="Border.card">
+        <Setter Property="Background" Value="{DynamicResource GitGatSurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource GitGatBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="18" />
+    </Style>
+
+    <Style Selector="Button.sidebar">
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="10,8" />
+        <Setter Property="CornerRadius" Value="8" />
+    </Style>
+
+    <Style Selector="Button.primary">
+        <Setter Property="Background" Value="{DynamicResource GitGatAccentBrush}" />
+        <Setter Property="Foreground" Value="#07110F" />
+        <Setter Property="Padding" Value="14,9" />
+        <Setter Property="CornerRadius" Value="8" />
+    </Style>
+
+    <Style Selector="TextBlock.muted">
+        <Setter Property="Foreground" Value="{DynamicResource GitGatMutedBrush}" />
+    </Style>
+</Styles>
