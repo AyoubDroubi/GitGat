@@ -3,8 +3,20 @@ name: quality-rust
 on:
   push:
     branches: [main]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "src/**"
+      - ".github/workflows/quality.yml"
   pull_request:
     branches: [main]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "src/**"
+      - ".github/workflows/quality.yml"
 
 permissions:
   contents: read
