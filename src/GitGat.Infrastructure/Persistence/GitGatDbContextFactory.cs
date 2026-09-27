@@ -6,7 +6,12 @@ public sealed class GitGatDbContextFactory
 {
     private readonly DbContextOptions<GitGatDbContext> _options;
 
-    public GitGatDbContextFactory(string? databasePath = null)
+    public GitGatDbContextFactory()
+        : this(null)
+    {
+    }
+
+    public GitGatDbContextFactory(string? databasePath)
     {
         if (string.IsNullOrWhiteSpace(databasePath))
         {
