@@ -1,27 +1,8 @@
-## .NET
-bin/
-obj/
-artifacts/
-*.user
-*.suo
-*.userosscache
-*.sln.docstates
-
-## IDE
-.vs/
-.idea/
-.vscode/
-
-## OS
-.DS_Store
-Thumbs.db
-
-## Local app data
+/target
 *.db
 *.db-shm
 *.db-wal
-logs/
-
-## Build/package output
-publish/
-*.nupkg
+.DS_Store
+.idea/
+.vscode/
+dist/
