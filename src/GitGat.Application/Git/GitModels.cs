@@ -58,3 +58,16 @@ public sealed record GitReflogEntry(
     string Sha,
     string Subject,
     DateTimeOffset? CreatedAt);
+
+public enum GitConflictResolution
+{
+    KeepOurs,
+    KeepTheirs
+}
+
+public enum GitResetMode
+{
+    Soft,
+    Mixed,
+    Hard
+}
