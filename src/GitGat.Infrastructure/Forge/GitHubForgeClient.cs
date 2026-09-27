@@ -170,6 +170,24 @@ public sealed class GitHubForgeClient : IForgeClient
             cancellationToken)).Trim();
     }
 
+    public async Task EditPullRequestAsync(
+        ForgeRepository repository,
+        int number,
+        string title,
+        string body,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            throw new InvalidOperationException("Pull request title is required.");
+        }
+
+        await RunRequiredAsync(
+            ["pr", "edit", number.ToString(), "--repo", repository.FullName,
+             "--title", title.Trim(), "--body", body ?? string.Empty],
+            cancellationToken);
+    }
+
     public async Task MergePullRequestAsync(
         ForgeRepository repository,
         int number,
