@@ -12,6 +12,13 @@
     WindowStartupLocation="CenterScreen"
     Background="{DynamicResource GitGatBackgroundBrush}">
 
+    <suki:SukiWindow.KeyBindings>
+        <KeyBinding Gesture="Ctrl+R" Command="{Binding RefreshRepositoryCommand}" />
+        <KeyBinding Gesture="Ctrl+Enter" Command="{Binding CommitCommand}" />
+        <KeyBinding Gesture="Ctrl+Shift+F" Command="{Binding FetchCommand}" />
+        <KeyBinding Gesture="Ctrl+Shift+P" Command="{Binding PushCommand}" />
+    </suki:SukiWindow.KeyBindings>
+
     <Grid ColumnDefinitions="290,*" RowDefinitions="*,Auto">
         <Border
             Grid.RowSpan="2"
@@ -522,6 +529,36 @@
                     </Grid>
                 </TabItem>
 
+                <TabItem Header="Settings">
+                    <ScrollViewer>
+                        <StackPanel Margin="4,14" Spacing="14">
+                            <Border Classes="card">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Classes="h2" Text="GitHub account" />
+                                    <TextBlock Classes="muted" Text="{Binding GitHubStatus}" TextWrapping="Wrap" />
+                                    <WrapPanel>
+                                        <Button Margin="0,0,6,0" Classes="primary" Command="{Binding ConnectGitHubCommand}" Content="Connect GitHub" />
+                                        <Button Margin="0,0,6,0" Classes="ghost" Command="{Binding RefreshGitHubCommand}" Content="Refresh connection" />
+                                        <Button Classes="danger" Command="{Binding DisconnectGitHubCommand}" Content="Disconnect" />
+                                    </WrapPanel>
+                                    <TextBlock Classes="muted" FontSize="11" Text="GitGat delegates credentials to GitHub CLI / OS credential storage. Tokens are not stored in the repository, SQLite catalog, or plaintext app settings." TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Classes="h2" Text="Keyboard" />
+                                    <TextBlock Text="Ctrl+R — refresh repository" />
+                                    <TextBlock Text="Ctrl+Enter — commit staged changes" />
+                                    <TextBlock Text="Ctrl+Shift+F — fetch" />
+                                    <TextBlock Text="Ctrl+Shift+P — push" />
+                                    <TextBlock Classes="muted" FontSize="11" Text="All core controls remain reachable with normal Tab / Shift+Tab focus navigation." TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
                 <TabItem Header="Advanced">
                     <ScrollViewer>
                         <StackPanel Margin="4,14" Spacing="14">
@@ -531,24 +568,49 @@
                                         <TextBlock Classes="h2" Text="Stashes" />
                                         <ListBox MaxHeight="180" ItemsSource="{Binding Stashes}" SelectedItem="{Binding SelectedStash, Mode=TwoWay}" />
                                         <WrapPanel>
-                                            <Button Margin="0,0,6,0" Classes="primary" Command="{Binding StashAllCommand}" Content="Stash all" />
-                                            <Button Classes="ghost" Command="{Binding ApplyStashCommand}" Content="Apply selected" />
+                                            <Button Margin="0,0,6,6" Classes="primary" Command="{Binding StashAllCommand}" Content="Stash all" />
+                                            <Button Margin="0,0,6,6" Classes="ghost" Command="{Binding ApplyStashCommand}" Content="Apply selected" />
+                                            <Button Margin="0,0,6,6" Classes="ghost" Command="{Binding PopStashCommand}" Content="Pop selected" />
+                                            <Button Margin="0,0,0,6" Classes="danger" Command="{Binding DropStashCommand}" Content="Drop selected" />
                                         </WrapPanel>
+                                        <TextBlock Classes="muted" FontSize="11" Text="Pop/drop: type the exact selected stash reference in the shared confirmation field below." TextWrapping="Wrap" />
                                     </StackPanel>
                                 </Border>
 
                                 <Border Grid.Column="1" Classes="card">
                                     <StackPanel Spacing="10">
-                                        <TextBlock Classes="h2" Text="Recovery" />
+                                        <TextBlock Classes="h2" Text="Conflict recovery" />
                                         <TextBlock Classes="muted" Text="{Binding CurrentRepositoryStatus.Operation, StringFormat='In-progress operation: {0}'}" />
                                         <TextBlock Classes="muted" Text="{Binding Conflicts.Count, StringFormat='{}{0} unresolved conflict(s)'}" />
-                                        <ListBox MaxHeight="100" ItemsSource="{Binding Conflicts}" />
-                                        <TextBox PlaceholderText="Type ABORT" Text="{Binding AdvancedConfirmation, Mode=TwoWay}" />
+                                        <ListBox MaxHeight="120" ItemsSource="{Binding Conflicts}" SelectedItem="{Binding SelectedConflict, Mode=TwoWay}" />
+                                        <WrapPanel>
+                                            <Button Margin="0,0,6,6" Classes="ghost" Command="{Binding ResolveConflictOursCommand}" Content="Keep ours" />
+                                            <Button Margin="0,0,6,6" Classes="ghost" Command="{Binding ResolveConflictTheirsCommand}" Content="Keep theirs" />
+                                            <Button Classes="primary" Command="{Binding MarkConflictResolvedCommand}" Content="Mark manually resolved" />
+                                        </WrapPanel>
+                                        <TextBox PlaceholderText="Type ABORT to abort current operation" Text="{Binding AdvancedConfirmation, Mode=TwoWay}" />
                                         <Button Classes="danger" Command="{Binding AbortOperationCommand}" Content="Abort current Git operation" />
-                                        <TextBlock Classes="muted" FontSize="11" Text="Only merge, rebase and cherry-pick aborts are supported here. Recovery claims are based on Git metadata." TextWrapping="Wrap" />
+                                        <TextBlock Classes="muted" FontSize="11" Text="Manual resolution is blocked while conflict-marker lines remain. Merge, rebase, cherry-pick and revert abort states are detected from Git metadata." TextWrapping="Wrap" />
                                     </StackPanel>
                                 </Border>
                             </Grid>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Classes="h2" Text="History-changing operations" />
+                                    <TextBlock Classes="muted" Text="These actions validate the target, record the previous HEAD in the operation journal, and require an exact typed confirmation." TextWrapping="Wrap" />
+                                    <TextBox PlaceholderText="Target commit / tag / branch" Text="{Binding AdvancedTarget, Mode=TwoWay}" />
+                                    <TextBox PlaceholderText="Confirmation, e.g. REBASE main or RESET HARD HEAD~1" Text="{Binding AdvancedConfirmation, Mode=TwoWay}" />
+                                    <WrapPanel>
+                                        <Button Margin="0,0,6,6" Classes="ghost" Command="{Binding RebaseCommand}" Content="Rebase onto target" />
+                                        <Button Margin="0,0,6,6" Classes="ghost" Command="{Binding CherryPickCommand}" Content="Cherry-pick target" />
+                                        <Button Margin="0,0,6,6" Classes="ghost" Command="{Binding ResetSoftCommand}" Content="Reset soft" />
+                                        <Button Margin="0,0,6,6" Classes="ghost" Command="{Binding ResetMixedCommand}" Content="Reset mixed" />
+                                        <Button Classes="danger" Command="{Binding ResetHardCommand}" Content="Reset hard" />
+                                    </WrapPanel>
+                                    <TextBlock Classes="muted" FontSize="11" Text="Hard reset is additionally blocked while the working tree is dirty. Force push remains unavailable." TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
 
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="14">
                                 <Border Classes="card">
@@ -560,33 +622,52 @@
                                             <Button Grid.Column="1" Classes="ghost" Click="PickWorktreePathClicked" Content="Browse" />
                                         </Grid>
                                         <TextBox PlaceholderText="Existing branch" Text="{Binding WorktreeBranch, Mode=TwoWay}" />
-                                        <Button Classes="primary" Command="{Binding CreateWorktreeCommand}" Content="Create worktree" />
+                                        <WrapPanel>
+                                            <Button Margin="0,0,6,6" Classes="primary" Command="{Binding CreateWorktreeCommand}" Content="Create" />
+                                            <Button Margin="0,0,6,6" Classes="ghost" Command="{Binding OpenWorktreeCommand}" Content="Open selected" />
+                                        </WrapPanel>
                                         <TextBox PlaceholderText="Exact selected path to confirm removal" Text="{Binding AdvancedConfirmation, Mode=TwoWay}" />
                                         <Button Classes="danger" Command="{Binding RemoveWorktreeCommand}" Content="Remove selected worktree" />
                                     </StackPanel>
                                 </Border>
 
                                 <Border Grid.Column="1" Classes="card">
-                                    <Grid RowDefinitions="Auto,*,Auto,*" RowSpacing="8">
-                                        <TextBlock Classes="h2" Text="Recovery evidence" />
-                                        <ListBox Grid.Row="1" MaxHeight="170" ItemsSource="{Binding Reflog}">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Classes="h2" Text="Reflog &amp; recovery branch" />
+                                        <ListBox MaxHeight="170" ItemsSource="{Binding Reflog}" SelectedItem="{Binding SelectedReflogEntry, Mode=TwoWay}">
                                             <ListBox.ItemTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Classes="mono" Text="{Binding Subject}" TextTrimming="CharacterEllipsis" />
+                                                    <StackPanel Margin="2,4">
+                                                        <TextBlock Classes="mono" Text="{Binding Selector}" />
+                                                        <TextBlock Classes="muted" FontSize="11" Text="{Binding Subject}" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
                                                 </DataTemplate>
                                             </ListBox.ItemTemplate>
                                         </ListBox>
-                                        <TextBlock Grid.Row="2" Classes="h2" Text="Operation journal" />
-                                        <ListBox Grid.Row="3" MaxHeight="170" ItemsSource="{Binding OperationJournal}">
-                                            <ListBox.ItemTemplate>
-                                                <DataTemplate>
-                                                    <TextBlock Classes="mono muted" Text="{Binding Operation}" />
-                                                </DataTemplate>
-                                            </ListBox.ItemTemplate>
-                                        </ListBox>
-                                    </Grid>
+                                        <TextBox PlaceholderText="recovery/my-lost-work" Text="{Binding RecoveryBranchName, Mode=TwoWay}" />
+                                        <Button Classes="primary" Command="{Binding CreateRecoveryBranchCommand}" Content="Create branch from selected reflog commit" />
+                                        <TextBlock Classes="muted" FontSize="11" Text="GitGat only offers recovery when the reflog provides an actual commit reference." TextWrapping="Wrap" />
+                                    </StackPanel>
                                 </Border>
                             </Grid>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Classes="h2" Text="Operation journal" />
+                                    <TextBlock Classes="muted" FontSize="11" Text="Durable local evidence for risky or compound operations; it is not a promise that data can always be recovered." TextWrapping="Wrap" />
+                                    <ListBox MaxHeight="220" ItemsSource="{Binding OperationJournal}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="2,4" ColumnDefinitions="160,*,Auto">
+                                                    <TextBlock Classes="mono" Text="{Binding Operation}" />
+                                                    <TextBlock Grid.Column="1" Classes="mono muted" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Grid.Column="2" Classes="muted" Text="{Binding Destructive, StringFormat='Risky: {0}'}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
