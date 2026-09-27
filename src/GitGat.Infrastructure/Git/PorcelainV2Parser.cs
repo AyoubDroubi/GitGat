@@ -94,7 +94,7 @@ public static class PorcelainV2Parser
                 path = pathField;
             }
 
-            var conflicted = recordType == 'u' || xy.Contains('U', StringComparison.Ordinal);
+            var conflicted = recordType == 'u' || xy.Contains('U');
             var staged = xy.Length > 0 && xy[0] is not '.' and not '?';
             var unstaged = xy.Length > 1 && xy[1] is not '.';
 
@@ -124,32 +124,32 @@ public static class PorcelainV2Parser
 
     private static GitChangeKind ToKind(string xy, char recordType)
     {
-        if (recordType == 'u' || xy.Contains('U', StringComparison.Ordinal))
+        if (recordType == 'u' || xy.Contains('U'))
         {
             return GitChangeKind.Conflicted;
         }
 
-        if (xy.Contains('R', StringComparison.Ordinal))
+        if (xy.Contains('R'))
         {
             return GitChangeKind.Renamed;
         }
 
-        if (xy.Contains('C', StringComparison.Ordinal))
+        if (xy.Contains('C'))
         {
             return GitChangeKind.Copied;
         }
 
-        if (xy.Contains('A', StringComparison.Ordinal))
+        if (xy.Contains('A'))
         {
             return GitChangeKind.Added;
         }
 
-        if (xy.Contains('D', StringComparison.Ordinal))
+        if (xy.Contains('D'))
         {
             return GitChangeKind.Deleted;
         }
 
-        if (xy.Contains('M', StringComparison.Ordinal))
+        if (xy.Contains('M'))
         {
             return GitChangeKind.Modified;
         }
