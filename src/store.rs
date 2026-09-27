@@ -111,19 +111,30 @@ impl Catalog {
     }
 
     pub fn relocate_repository(&self, old: &Path, new: &Path) -> Result<()> {
+        let canonical_new = new
+            .canonicalize()
+            .with_context(|| format!("failed to resolve {}", new.display()))?;
         let connection = self.connection()?;
-        let name = new
+        let name = canonical_new
             .file_name()
             .and_then(|v| v.to_str())
             .unwrap_or("Repository")
             .to_owned();
-        connection.execute(
+        let changed = connection.execute(
             "UPDATE repositories SET path=?2,name=?3,last_opened_unix=?4 WHERE path=?1",
-            params![old.to_string_lossy(), new.to_string_lossy(), name, now_unix()],
+            params![
+                old.to_string_lossy(),
+                canonical_new.to_string_lossy(),
+                name,
+                now_unix()
+            ],
         )?;
+        if changed == 0 {
+            anyhow::bail!("repository catalog entry was not found: {}", old.display());
+        }
         connection.execute(
             "UPDATE workspace_repositories SET repository_path=?2 WHERE repository_path=?1",
-            params![old.to_string_lossy(), new.to_string_lossy()],
+            params![old.to_string_lossy(), canonical_new.to_string_lossy()],
         )?;
         Ok(())
     }
