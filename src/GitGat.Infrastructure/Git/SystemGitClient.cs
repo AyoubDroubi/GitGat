@@ -748,6 +748,58 @@ public sealed partial class SystemGitClient : IGitClient
         throw new InvalidOperationException("No supported Git operation is currently in progress.");
     }
 
+    private async Task EnsureCleanForHistoryChangeAsync(
+        string repositoryPath,
+        CancellationToken cancellationToken)
+    {
+        var status = await GetStatusAsync(repositoryPath, cancellationToken);
+        if (status.Operation is not null)
+        {
+            throw new InvalidOperationException(
+                "Finish or abort the current Git operation before changing history.");
+        }
+
+        if (!status.IsClean)
+        {
+            throw new InvalidOperationException(
+                "Commit or stash changes before changing history.");
+        }
+    }
+
+    private async Task VerifyCommitAsync(
+        string repositoryPath,
+        string reference,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(reference))
+        {
+            throw new InvalidOperationException("A Git commit or reference is required.");
+        }
+
+        var result = await _runner.RunAsync(
+            repositoryPath,
+            ["rev-parse", "--verify", "--quiet", $"{reference}^{{commit}}"],
+            cancellationToken);
+
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"Git reference '{reference}' does not resolve to a commit.");
+        }
+    }
+
+    private async Task<string> GetHeadAsync(
+        string repositoryPath,
+        CancellationToken cancellationToken)
+    {
+        var result = await _runner.RunAsync(
+            repositoryPath,
+            ["rev-parse", "HEAD"],
+            cancellationToken);
+        EnsureSuccess(result);
+        return result.StandardOutput.Trim();
+    }
+
     private async Task<(RepositoryStatus Status, IReadOnlyList<GitChange> Changes)> ReadStatusAsync(
         string repositoryPath,
         CancellationToken cancellationToken)
