@@ -28,7 +28,7 @@ pub struct GitGatApp {
     branch_name: String, target_ref: String, confirmation: String, stash_message: String, stash_ref: String,
     worktree_path: String, worktree_branch: String, lfs_path: String, pr_number: String, pr_title: String,
     pr_body: String, pr_comment: String, run_id: String, workspace_name: String, diff_text: String,
-    output_text: String, notice: String, history_limit: usize,
+    relocate_from: String, relocate_to: String, output_text: String, notice: String, history_limit: usize,
 }
 
 impl GitGatApp {
@@ -42,7 +42,8 @@ impl GitGatApp {
             stash_ref: String::from("stash@{0}"), worktree_path: String::new(), worktree_branch: String::new(),
             lfs_path: String::new(), pr_number: String::new(), pr_title: String::new(), pr_body: String::new(),
             pr_comment: String::new(), run_id: String::new(), workspace_name: String::new(), diff_text: String::new(),
-            output_text: String::new(), notice: String::from("Open or clone a repository to begin."), history_limit: 100,
+            relocate_from: String::new(), relocate_to: String::new(), output_text: String::new(),
+            notice: String::from("Open or clone a repository to begin."), history_limit: 100,
         }
     }
 
@@ -170,7 +171,12 @@ impl GitGatApp {
                             && let Err(error) = self.catalog.set_favorite(&repository.path, favorite) { self.notice = error.to_string(); }
                         if ui.button(&repository.name).clicked() {
                             if repository.path.exists() { self.open_repository(repository.path.clone()); }
-                            else { self.notice = format!("{} no longer exists.", repository.path.display()); }
+                            else {
+                                self.relocate_from = repository.path.to_string_lossy().to_string();
+                                self.relocate_to.clear();
+                                self.tab = Tab::Settings;
+                                self.notice = format!("{} no longer exists. Choose its new location below.", repository.path.display());
+                            }
                         }
                         ui.weak(repository.path.to_string_lossy());
                     });
@@ -435,6 +441,32 @@ impl GitGatApp {
                 match self.forge.logout(){Ok(text)=>{self.output_text=text;self.forge_snapshot=ForgeSnapshot::default();self.notice="GitHub disconnected.".to_owned();},Err(error)=>self.notice=error.to_string()}
             }
         });
+        ui.separator();
+        ui.heading("Relocate moved repository");
+        ui.weak("Use this when a repository in Recent repositories was moved or renamed outside GitGat.");
+        ui.add(TextEdit::singleline(&mut self.relocate_from).hint_text("Old stored path"));
+        ui.add(TextEdit::singleline(&mut self.relocate_to).hint_text("New repository path"));
+        if ui.button("Relocate catalog entry").clicked() {
+            let old = PathBuf::from(self.relocate_from.trim());
+            let new_input = PathBuf::from(self.relocate_to.trim());
+            match self.git.repository_root(&new_input) {
+                Ok(new_root) => match self.catalog.relocate_repository(&old, &new_root) {
+                    Ok(()) => {
+                        if self.repository.as_ref() == Some(&old) {
+                            self.repository = Some(new_root.clone());
+                            self.repository_input = new_root.to_string_lossy().to_string();
+                            self.refresh_git();
+                        }
+                        self.relocate_from.clear();
+                        self.relocate_to.clear();
+                        self.notice = "Repository catalog entry relocated.".to_owned();
+                    }
+                    Err(error) => self.notice = error.to_string(),
+                },
+                Err(error) => self.notice = format!("New path is not a Git repository: {error}"),
+            }
+        }
+
         ui.separator();ui.heading("Safety defaults");
         ui.label("• Pull uses --ff-only.");ui.label("• No force push action.");ui.label("• Branch deletion uses git branch -d.");
         ui.label("• Discard refuses untracked files.");ui.label("• Branch switch, rebase and cherry-pick require a clean worktree.");
