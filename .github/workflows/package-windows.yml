@@ -41,7 +41,7 @@ jobs:
       - name: Install Inno Setup
         shell: pwsh
         run: |
-          $iscc = Join-Path \${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
+          $iscc = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) {
             choco install innosetup --yes --no-progress
           }
@@ -50,10 +50,10 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $version = "\${{ github.event.inputs.version }}"
+          $version = "${{ github.event.inputs.version }}"
           if ([string]::IsNullOrWhiteSpace($version)) {
-            if ("\${{ github.ref_type }}" -eq "tag") {
-              $version = "\${{ github.ref_name }}".TrimStart("v")
+            if ("${{ github.ref_type }}" -eq "tag") {
+              $version = "${{ github.ref_name }}".TrimStart("v")
             } else {
               $version = "0.1.0"
             }
@@ -62,11 +62,11 @@ jobs:
 
       - name: Build, verify and package
         shell: pwsh
-        run: ./scripts/package-windows.ps1 -Version "\${{ steps.version.outputs.value }}"
+        run: ./scripts/package-windows.ps1 -Version "${{ steps.version.outputs.value }}"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: GitGat-\${{ steps.version.outputs.value }}-win-x64
+          name: GitGat-${{ steps.version.outputs.value }}-win-x64
           if-no-files-found: error
           retention-days: 30
           path: |
