@@ -104,9 +104,10 @@ impl Catalog {
     }
 
     pub fn set_favorite(&self, path: &Path, favorite: bool) -> Result<()> {
+        let normalized = normalize_existing_path(path);
         self.connection()?.execute(
             "UPDATE repositories SET favorite=?2 WHERE path=?1",
-            params![path.to_string_lossy(), i64::from(favorite)],
+            params![normalized.to_string_lossy(), i64::from(favorite)],
         )?;
         Ok(())
     }
@@ -155,9 +156,10 @@ impl Catalog {
     }
 
     pub fn add_to_workspace(&self, workspace_id: i64, repository: &Path) -> Result<()> {
+        let normalized = normalize_existing_path(repository);
         self.connection()?.execute(
             "INSERT OR IGNORE INTO workspace_repositories(workspace_id,repository_path) VALUES(?1,?2)",
-            params![workspace_id, repository.to_string_lossy()],
+            params![workspace_id, normalized.to_string_lossy()],
         )?;
         Ok(())
     }
@@ -219,6 +221,10 @@ impl Catalog {
     }
 }
 
+fn normalize_existing_path(path: &Path) -> PathBuf {
+    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
+}
+
 fn now_unix() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -275,11 +281,12 @@ mod tests {
         std::fs::create_dir_all(&old).unwrap();
         let catalog = Catalog::open(root.path().join("catalog.db")).unwrap();
         catalog.touch_repository(&old).unwrap();
+        let stored_old = catalog.repositories().unwrap()[0].path.clone();
         let workspace = catalog.create_workspace("Moved").unwrap();
         catalog.add_to_workspace(workspace, &old).unwrap();
 
         std::fs::rename(&old, &new).unwrap();
-        catalog.relocate_repository(&old, &new).unwrap();
+        catalog.relocate_repository(&stored_old, &new).unwrap();
 
         let repositories = catalog.repositories().unwrap();
         assert_eq!(repositories.len(), 1);
