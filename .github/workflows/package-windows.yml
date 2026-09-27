@@ -1,3 +1,4 @@
+# Rust Windows release validation: build, self-check, install, launch, uninstall, checksum.
 name: package-windows-rust
 
 on:
