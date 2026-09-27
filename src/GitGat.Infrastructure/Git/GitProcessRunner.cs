@@ -46,7 +46,19 @@ internal sealed class GitProcessRunner
         var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
         var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
 
-        await process.WaitForExitAsync(cancellationToken);
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+
+            throw;
+        }
 
         return new GitCommandResult(
             process.ExitCode,
