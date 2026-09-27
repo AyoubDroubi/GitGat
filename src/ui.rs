@@ -452,8 +452,8 @@ impl eframe::App for GitGatApp {
         let dropped = ctx.input(|i| {
             i.raw
                 .dropped_files
-                .iter()
-                .find_map(|file| file.path().map(Path::to_path_buf))
+                .first()
+                .map(|file| file.path().to_path_buf())
         });
         if let Some(path) = dropped {
             self.open_repository(path);
