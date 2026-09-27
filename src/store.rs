@@ -227,10 +227,10 @@ fn now_unix() -> i64 {
 }
 
 fn data_home() -> PathBuf {
-    if cfg!(windows) {
-        if let Some(path) = std::env::var_os("LOCALAPPDATA") {
-            return PathBuf::from(path).join("GitGat");
-        }
+    if cfg!(windows)
+        && let Some(path) = std::env::var_os("LOCALAPPDATA")
+    {
+        return PathBuf::from(path).join("GitGat");
     }
     if let Some(path) = std::env::var_os("XDG_DATA_HOME") {
         return PathBuf::from(path).join("gitgat");
