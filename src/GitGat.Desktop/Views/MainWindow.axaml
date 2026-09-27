@@ -89,6 +89,11 @@
                             CommandParameter="{Binding ActiveRepository}"
                             Content="Favorite" />
                         <Button
+                            Margin="0,0,6,6"
+                            Classes="ghost"
+                            Click="UpdateRepositoryLocationClicked"
+                            Content="Relocate" />
+                        <Button
                             Margin="0,0,0,6"
                             Classes="danger"
                             Command="{Binding RemoveRepositoryCommand}"
@@ -188,12 +193,31 @@
                                         <TextBlock Classes="h2" Text="Notifications" />
                                         <TextBlock Grid.Column="1" Classes="muted" Text="{Binding Notifications.Count, StringFormat='{}{0} items'}" />
                                     </Grid>
-                                    <ListBox MaxHeight="250" ItemsSource="{Binding Notifications}">
+                                    <ListBox MaxHeight="200" ItemsSource="{Binding Notifications}">
                                         <ListBox.ItemTemplate>
                                             <DataTemplate>
                                                 <StackPanel Margin="2,5" Spacing="2">
                                                     <TextBlock FontWeight="SemiBold" Text="{Binding Subject}" />
                                                     <TextBlock Classes="muted" FontSize="11" Text="{Binding Repository}" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="card">
+                                <StackPanel Spacing="10">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Classes="h2" Text="Team activity" />
+                                        <TextBlock Grid.Column="1" Classes="muted" Text="{Binding Activity.Count, StringFormat='{}{0} events'}" />
+                                    </Grid>
+                                    <ListBox MaxHeight="220" ItemsSource="{Binding Activity}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Margin="2,5">
+                                                    <TextBlock FontWeight="SemiBold" Text="{Binding Type}" />
+                                                    <TextBlock Classes="muted" FontSize="11" Text="{Binding Actor}" />
                                                 </StackPanel>
                                             </DataTemplate>
                                         </ListBox.ItemTemplate>
@@ -318,6 +342,7 @@
                                         </DataTemplate>
                                     </ListBox.ItemTemplate>
                                 </ListBox>
+                                <Button Grid.Row="2" Margin="0,8,0,0" Classes="ghost" Command="{Binding LoadMoreHistoryCommand}" Content="Load 100 more" />
                             </Grid>
                         </Border>
                         <Border Grid.Column="1" Classes="card">
@@ -365,6 +390,7 @@
                                             <Button Margin="0,0,6,6" Classes="ghost" Command="{Binding CommentPullRequestCommand}" Content="Comment" />
                                             <Button Margin="0,0,6,6" Classes="primary" Command="{Binding ApprovePullRequestCommand}" Content="Approve" />
                                             <Button Margin="0,0,6,6" Classes="danger" Command="{Binding RequestChangesCommand}" Content="Request changes" />
+                                            <Button Margin="0,0,6,6" Classes="ghost" Command="{Binding EditPullRequestCommand}" Content="Save title/body edits" />
                                             <Button Classes="ghost" Command="{Binding MergePullRequestCommand}" Content="Merge if allowed" />
                                         </WrapPanel>
                                     </StackPanel>
@@ -515,6 +541,8 @@
                                     <StackPanel Spacing="10">
                                         <TextBlock Classes="h2" Text="Recovery" />
                                         <TextBlock Classes="muted" Text="{Binding CurrentRepositoryStatus.Operation, StringFormat='In-progress operation: {0}'}" />
+                                        <TextBlock Classes="muted" Text="{Binding Conflicts.Count, StringFormat='{}{0} unresolved conflict(s)'}" />
+                                        <ListBox MaxHeight="100" ItemsSource="{Binding Conflicts}" />
                                         <TextBox PlaceholderText="Type ABORT" Text="{Binding AdvancedConfirmation, Mode=TwoWay}" />
                                         <Button Classes="danger" Command="{Binding AbortOperationCommand}" Content="Abort current Git operation" />
                                         <TextBlock Classes="muted" FontSize="11" Text="Only merge, rebase and cherry-pick aborts are supported here. Recovery claims are based on Git metadata." TextWrapping="Wrap" />
