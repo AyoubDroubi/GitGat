@@ -27,7 +27,7 @@
                 <StackPanel Grid.Row="1" Margin="0,20,0,12" Spacing="8">
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
                         <TextBox
-                            Watermark="Search repositories…"
+                            PlaceholderText="Search repositories…"
                             Text="{Binding RepositorySearch, Mode=TwoWay}" />
                         <Button
                             Grid.Column="1"
@@ -159,9 +159,9 @@
                                 <Border Classes="card">
                                     <StackPanel Spacing="10">
                                         <TextBlock Classes="h2" Text="Clone repository" />
-                                        <TextBox Watermark="https://github.com/owner/repo.git" Text="{Binding CloneUrl, Mode=TwoWay}" />
+                                        <TextBox PlaceholderText="https://github.com/owner/repo.git" Text="{Binding CloneUrl, Mode=TwoWay}" />
                                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                            <TextBox Watermark="Empty destination folder" Text="{Binding CloneDestination, Mode=TwoWay}" />
+                                            <TextBox PlaceholderText="Empty destination folder" Text="{Binding CloneDestination, Mode=TwoWay}" />
                                             <Button Grid.Column="1" Classes="ghost" Click="PickCloneDestinationClicked" Content="Browse" />
                                         </Grid>
                                         <Button Classes="primary" Command="{Binding CloneRepositoryCommand}" Content="Clone &amp; open" />
@@ -244,14 +244,14 @@
                                         FontSize="12"
                                         Text="{Binding DiffText}"
                                         TextWrapping="NoWrap"
-                                        VerticalScrollBarVisibility="Auto"
-                                        HorizontalScrollBarVisibility="Auto" />
+                                        ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                        ScrollViewer.HorizontalScrollBarVisibility="Auto" />
                                 </Grid>
                             </Border>
 
                             <Border Grid.Row="1" Classes="card">
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                                    <TextBox Watermark="Commit message" Text="{Binding CommitMessage, Mode=TwoWay}" />
+                                    <TextBox PlaceholderText="Commit message" Text="{Binding CommitMessage, Mode=TwoWay}" />
                                     <Button Grid.Column="1" Classes="primary" Command="{Binding CommitCommand}" Content="Commit staged" />
                                 </Grid>
                             </Border>
@@ -261,7 +261,7 @@
                                     <TextBlock Foreground="{DynamicResource GitGatDangerBrush}" FontWeight="SemiBold" Text="Discard tracked change" />
                                     <TextBlock Classes="muted" FontSize="11" Text="GitGat never silently removes untracked files. Type the exact selected path to confirm." />
                                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                                        <TextBox Text="{Binding DiscardConfirmation, Mode=TwoWay}" Watermark="Exact file path" />
+                                        <TextBox Text="{Binding DiscardConfirmation, Mode=TwoWay}" PlaceholderText="Exact file path" />
                                         <Button Grid.Column="1" Classes="danger" Command="{Binding DiscardSelectedCommand}" Content="Discard" />
                                     </Grid>
                                 </StackPanel>
@@ -294,7 +294,7 @@
                             <StackPanel Spacing="10">
                                 <TextBlock Classes="h2" Text="Branch actions" />
                                 <Button Classes="primary" Command="{Binding CheckoutBranchCommand}" Content="Switch selected" />
-                                <TextBox Watermark="new-branch-name" Text="{Binding NewBranchName, Mode=TwoWay}" />
+                                <TextBox PlaceholderText="new-branch-name" Text="{Binding NewBranchName, Mode=TwoWay}" />
                                 <Button Classes="ghost" Command="{Binding CreateBranchCommand}" Content="Create &amp; switch" />
                                 <Button Classes="danger" Command="{Binding DeleteBranchCommand}" Content="Delete selected (merged only)" />
                                 <TextBlock Classes="muted" FontSize="11" Text="Switching is blocked while the working tree is dirty. Branch deletion uses Git's safe -d behavior." TextWrapping="Wrap" />
@@ -324,7 +324,7 @@
                             <Grid RowDefinitions="Auto,Auto,*">
                                 <TextBlock Classes="h2" Text="Commit detail" />
                                 <Button Grid.Row="1" Margin="0,10,0,8" HorizontalAlignment="Left" Classes="ghost" Command="{Binding ShowCommitCommand}" Content="Load selected" />
-                                <TextBox Grid.Row="2" AcceptsReturn="True" IsReadOnly="True" Text="{Binding CommitDetailText}" VerticalScrollBarVisibility="Auto" />
+                                <TextBox Grid.Row="2" AcceptsReturn="True" IsReadOnly="True" Text="{Binding CommitDetailText}" ScrollViewer.VerticalScrollBarVisibility="Auto" />
                             </Grid>
                         </Border>
                     </Grid>
@@ -360,7 +360,7 @@
                                                 <DataTemplate><TextBlock Classes="mono muted" Text="{Binding}" /></DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
-                                        <TextBox AcceptsReturn="True" MinHeight="70" Watermark="Review comment" Text="{Binding PullRequestComment, Mode=TwoWay}" />
+                                        <TextBox AcceptsReturn="True" MinHeight="70" PlaceholderText="Review comment" Text="{Binding PullRequestComment, Mode=TwoWay}" />
                                         <WrapPanel>
                                             <Button Margin="0,0,6,6" Classes="ghost" Command="{Binding CommentPullRequestCommand}" Content="Comment" />
                                             <Button Margin="0,0,6,6" Classes="primary" Command="{Binding ApprovePullRequestCommand}" Content="Approve" />
@@ -374,11 +374,11 @@
                                     <StackPanel Spacing="8">
                                         <TextBlock Classes="h2" Text="Create pull request" />
                                         <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                                            <TextBox Watermark="head branch" Text="{Binding PullRequestHead, Mode=TwoWay}" />
-                                            <TextBox Grid.Column="1" Watermark="base branch" Text="{Binding PullRequestBase, Mode=TwoWay}" />
+                                            <TextBox PlaceholderText="head branch" Text="{Binding PullRequestHead, Mode=TwoWay}" />
+                                            <TextBox Grid.Column="1" PlaceholderText="base branch" Text="{Binding PullRequestBase, Mode=TwoWay}" />
                                         </Grid>
-                                        <TextBox Watermark="Title" Text="{Binding PullRequestTitle, Mode=TwoWay}" />
-                                        <TextBox AcceptsReturn="True" MinHeight="70" Watermark="Description" Text="{Binding PullRequestBody, Mode=TwoWay}" />
+                                        <TextBox PlaceholderText="Title" Text="{Binding PullRequestTitle, Mode=TwoWay}" />
+                                        <TextBox AcceptsReturn="True" MinHeight="70" PlaceholderText="Description" Text="{Binding PullRequestBody, Mode=TwoWay}" />
                                         <Button Classes="primary" HorizontalAlignment="Left" Command="{Binding CreatePullRequestCommand}" Content="Create PR" />
                                     </StackPanel>
                                 </Border>
@@ -412,7 +412,7 @@
                                 <TextBlock Classes="h2" Text="Lock controls" />
                                 <Button Classes="primary" Command="{Binding LockSelectedCommand}" Content="Lock selected changed file" />
                                 <Button Classes="ghost" Command="{Binding UnlockSelectedCommand}" Content="Unlock selected lock" />
-                                <TextBox Watermark="*.uasset" Text="{Binding LfsPattern, Mode=TwoWay}" />
+                                <TextBox PlaceholderText="*.uasset" Text="{Binding LfsPattern, Mode=TwoWay}" />
                                 <Button Classes="ghost" Command="{Binding ConfigureLockablePatternCommand}" Content="Mark pattern lockable" />
                                 <TextBlock Classes="muted" FontSize="11" Text="Force unlock is intentionally not exposed as a default UI action." TextWrapping="Wrap" />
                             </StackPanel>
@@ -444,7 +444,7 @@
                                     <Button Classes="primary" Command="{Binding RerunFailedWorkflowCommand}" Content="Rerun failed jobs" />
                                 </WrapPanel>
                                 <TextBlock Grid.Row="1" Margin="0,10,0,6" Classes="muted" Text="Large logs are loaded only on demand." />
-                                <TextBox Grid.Row="2" AcceptsReturn="True" IsReadOnly="True" FontFamily="Cascadia Mono, Consolas, monospace" FontSize="12" Text="{Binding WorkflowLogText}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" />
+                                <TextBox Grid.Row="2" AcceptsReturn="True" IsReadOnly="True" FontFamily="Cascadia Mono, Consolas, monospace" FontSize="12" Text="{Binding WorkflowLogText}" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto" />
                             </Grid>
                         </Border>
                     </Grid>
@@ -486,7 +486,7 @@
                         <Border Grid.Column="1" Classes="card">
                             <StackPanel Spacing="10">
                                 <TextBlock Classes="h2" Text="Workspace membership" />
-                                <TextBox Watermark="Workspace name" Text="{Binding WorkspaceName, Mode=TwoWay}" />
+                                <TextBox PlaceholderText="Workspace name" Text="{Binding WorkspaceName, Mode=TwoWay}" />
                                 <Button Classes="primary" Command="{Binding CreateWorkspaceCommand}" Content="Create workspace with active repository" />
                                 <Button Classes="ghost" Command="{Binding AddRepositoryToWorkspaceCommand}" Content="Add active repository to selected" />
                                 <Button Classes="ghost" Command="{Binding RemoveRepositoryFromWorkspaceCommand}" Content="Remove active repository from selected" />
@@ -515,7 +515,7 @@
                                     <StackPanel Spacing="10">
                                         <TextBlock Classes="h2" Text="Recovery" />
                                         <TextBlock Classes="muted" Text="{Binding CurrentRepositoryStatus.Operation, StringFormat='In-progress operation: {0}'}" />
-                                        <TextBox Watermark="Type ABORT" Text="{Binding AdvancedConfirmation, Mode=TwoWay}" />
+                                        <TextBox PlaceholderText="Type ABORT" Text="{Binding AdvancedConfirmation, Mode=TwoWay}" />
                                         <Button Classes="danger" Command="{Binding AbortOperationCommand}" Content="Abort current Git operation" />
                                         <TextBlock Classes="muted" FontSize="11" Text="Only merge, rebase and cherry-pick aborts are supported here. Recovery claims are based on Git metadata." TextWrapping="Wrap" />
                                     </StackPanel>
@@ -528,12 +528,12 @@
                                         <TextBlock Classes="h2" Text="Worktrees" />
                                         <ListBox MaxHeight="160" ItemsSource="{Binding Worktrees}" SelectedItem="{Binding SelectedWorktree, Mode=TwoWay}" />
                                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                            <TextBox Watermark="Worktree directory" Text="{Binding WorktreePath, Mode=TwoWay}" />
+                                            <TextBox PlaceholderText="Worktree directory" Text="{Binding WorktreePath, Mode=TwoWay}" />
                                             <Button Grid.Column="1" Classes="ghost" Click="PickWorktreePathClicked" Content="Browse" />
                                         </Grid>
-                                        <TextBox Watermark="Existing branch" Text="{Binding WorktreeBranch, Mode=TwoWay}" />
+                                        <TextBox PlaceholderText="Existing branch" Text="{Binding WorktreeBranch, Mode=TwoWay}" />
                                         <Button Classes="primary" Command="{Binding CreateWorktreeCommand}" Content="Create worktree" />
-                                        <TextBox Watermark="Exact selected path to confirm removal" Text="{Binding AdvancedConfirmation, Mode=TwoWay}" />
+                                        <TextBox PlaceholderText="Exact selected path to confirm removal" Text="{Binding AdvancedConfirmation, Mode=TwoWay}" />
                                         <Button Classes="danger" Command="{Binding RemoveWorktreeCommand}" Content="Remove selected worktree" />
                                     </StackPanel>
                                 </Border>
