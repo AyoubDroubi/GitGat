@@ -82,7 +82,9 @@ public partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<string> ChangedPullRequestFiles { get; } = [];
     public ObservableCollection<WorkflowRunSummary> WorkflowRuns { get; } = [];
     public ObservableCollection<ForgeNotification> Notifications { get; } = [];
+    public ObservableCollection<TeamActivityItem> Activity { get; } = [];
     public ObservableCollection<string> MyWorkItems { get; } = [];
+    public ObservableCollection<string> Conflicts { get; } = [];
     public ObservableCollection<GitStash> Stashes { get; } = [];
     public ObservableCollection<GitWorktree> Worktrees { get; } = [];
     public ObservableCollection<GitReflogEntry> Reflog { get; } = [];
@@ -292,6 +294,19 @@ public partial class MainWindowViewModel : ObservableObject
             });
 
     [RelayCommand]
+    private Task LoadMoreHistoryAsync() =>
+        ActiveRepository is null
+            ? Task.CompletedTask
+            : RunAsync("Loading more history…", async () =>
+            {
+                var next = await _git.GetHistoryAsync(ActiveRepository.LocalPath, History.Count, 100);
+                foreach (var commit in next)
+                {
+                    History.Add(commit);
+                }
+            });
+
+    [RelayCommand]
     private Task ShowCommitAsync() =>
         ActiveRepository is null || SelectedCommit is null
             ? Task.CompletedTask
@@ -368,6 +383,10 @@ public partial class MainWindowViewModel : ObservableObject
                 var detail = await _forge.GetPullRequestAsync(forgeRepository, pullRequest.Number);
                 SelectedPullRequest = pullRequest;
                 Replace(ChangedPullRequestFiles, detail.ChangedFiles);
+                PullRequestTitle = detail.Summary.Title;
+                PullRequestBody = detail.Body;
+                PullRequestHead = detail.Summary.HeadBranch;
+                PullRequestBase = detail.Summary.BaseBranch;
                 PullRequestDetailText =
                     $"#{detail.Summary.Number} {detail.Summary.Title}{Environment.NewLine}" +
                     $"{detail.Summary.Author} · {detail.Summary.HeadBranch} → {detail.Summary.BaseBranch}{Environment.NewLine}" +
@@ -396,6 +415,20 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private Task RequestChangesAsync() =>
         ReviewPullRequestAsync(PullRequestReviewAction.RequestChanges);
+
+    [RelayCommand]
+    private Task EditPullRequestAsync() =>
+        SelectedPullRequest is null
+            ? Task.CompletedTask
+            : RunAsync("Updating pull request…", async () =>
+            {
+                await _forge.EditPullRequestAsync(
+                    RequireForgeRepository(),
+                    SelectedPullRequest.Number,
+                    PullRequestTitle,
+                    PullRequestBody);
+                await LoadForgeForActiveRepositoryAsync();
+            });
 
     [RelayCommand]
     private Task MergePullRequestAsync() =>
@@ -623,6 +656,7 @@ public partial class MainWindowViewModel : ObservableObject
         Replace(Changes, await _git.GetChangesAsync(ActiveRepository.LocalPath));
         Replace(Branches, await _git.GetBranchesAsync(ActiveRepository.LocalPath));
         Replace(History, await _git.GetHistoryAsync(ActiveRepository.LocalPath));
+        Replace(Conflicts, await _git.GetConflictsAsync(ActiveRepository.LocalPath));
         await LoadLocksAsync();
         await LoadAdvancedAsync();
         await LoadForgeForActiveRepositoryAsync();
@@ -677,6 +711,7 @@ public partial class MainWindowViewModel : ObservableObject
     {
         PullRequests.Clear();
         WorkflowRuns.Clear();
+        Activity.Clear();
 
         if (ActiveRepository is null)
         {
@@ -698,6 +733,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         Replace(PullRequests, await _forge.GetPullRequestsAsync(repository));
         Replace(WorkflowRuns, await _forge.GetWorkflowRunsAsync(repository));
+        Replace(Activity, await _forge.GetActivityAsync(repository));
     }
 
     private async Task LoadMyWorkAsync()
@@ -839,6 +875,8 @@ public partial class MainWindowViewModel : ObservableObject
         Locks.Clear();
         PullRequests.Clear();
         WorkflowRuns.Clear();
+        Activity.Clear();
+        Conflicts.Clear();
         Stashes.Clear();
         Worktrees.Clear();
         Reflog.Clear();
