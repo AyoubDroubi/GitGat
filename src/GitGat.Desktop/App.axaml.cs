@@ -1,12 +1,19 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using GitGat.Application.Forge;
 using GitGat.Application.Git;
+using GitGat.Application.Operations;
 using GitGat.Application.Repositories;
+using GitGat.Application.Workspaces;
 using GitGat.Desktop.ViewModels;
 using GitGat.Desktop.Views;
+using GitGat.Infrastructure.Forge;
 using GitGat.Infrastructure.Git;
+using GitGat.Infrastructure.Operations;
+using GitGat.Infrastructure.Persistence;
 using GitGat.Infrastructure.Repositories;
+using GitGat.Infrastructure.Workspaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -25,8 +32,13 @@ public partial class App : Avalonia.Application
     {
         var builder = Host.CreateApplicationBuilder();
 
+        builder.Services.AddSingleton<GitGatDbContextFactory>();
+        builder.Services.AddSingleton<IOperationJournal, FileOperationJournal>();
         builder.Services.AddSingleton<IGitClient, SystemGitClient>();
-        builder.Services.AddSingleton<IRepositoryCatalog, InMemoryRepositoryCatalog>();
+        builder.Services.AddSingleton<IGitLfsClient, SystemGitLfsClient>();
+        builder.Services.AddSingleton<IForgeClient, GitHubForgeClient>();
+        builder.Services.AddSingleton<IRepositoryCatalog, SqliteRepositoryCatalog>();
+        builder.Services.AddSingleton<IWorkspaceCatalog, SqliteWorkspaceCatalog>();
         builder.Services.AddSingleton<MainWindowViewModel>();
         builder.Services.AddSingleton<MainWindow>();
 

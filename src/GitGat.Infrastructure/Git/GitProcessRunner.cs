@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 
 namespace GitGat.Infrastructure.Git;
 
@@ -18,6 +19,8 @@ internal sealed class GitProcessRunner
             UseShellExecute = false,
             CreateNoWindow = true
         };
+
+        startInfo.Environment["GIT_TERMINAL_PROMPT"] = "0";
 
         foreach (var argument in arguments)
         {
@@ -48,6 +51,26 @@ internal sealed class GitProcessRunner
         return new GitCommandResult(
             process.ExitCode,
             await outputTask,
-            await errorTask);
+            Sanitize(await errorTask));
+    }
+
+    private static string Sanitize(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return value;
+        }
+
+        var sanitized = Regex.Replace(
+            value,
+            @"https://[^\s/@:]+:[^\s/@]+@",
+            "https://[REDACTED]@",
+            RegexOptions.CultureInvariant);
+
+        return Regex.Replace(
+            sanitized,
+            @"(?:ghp|github_pat)_[A-Za-z0-9_]+",
+            "[REDACTED]",
+            RegexOptions.CultureInvariant);
     }
 }
