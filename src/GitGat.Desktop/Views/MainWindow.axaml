@@ -1,0 +1,188 @@
+<suki:SukiWindow
+    x:Class="GitGat.Desktop.Views.MainWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:suki="clr-namespace:SukiUI.Controls;assembly=SukiUI"
+    x:CompileBindings="False"
+    Title="GitGat"
+    Width="1360"
+    Height="860"
+    MinWidth="980"
+    MinHeight="680"
+    WindowStartupLocation="CenterScreen"
+    Background="{DynamicResource GitGatBackgroundBrush}">
+
+    <Grid ColumnDefinitions="250,*">
+        <Border
+            Grid.Column="0"
+            Background="{DynamicResource GitGatSidebarBrush}"
+            BorderBrush="{DynamicResource GitGatBorderBrush}"
+            BorderThickness="0,0,1,0">
+            <Grid Margin="16" RowDefinitions="Auto,Auto,*,Auto">
+                <StackPanel Spacing="3">
+                    <TextBlock FontSize="22" FontWeight="SemiBold" Text="GitGat" />
+                    <TextBlock Classes="muted" FontSize="12" Text="Your Git workspace" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" Margin="0,24,0,0" Spacing="4">
+                    <TextBlock
+                        Margin="10,0,0,6"
+                        Classes="muted"
+                        FontSize="11"
+                        FontWeight="SemiBold"
+                        Text="WORKSPACE" />
+                    <ItemsControl ItemsSource="{Binding PrimaryNavigation}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Classes="sidebar">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Text="{Binding Label}" />
+                                        <TextBlock
+                                            Grid.Column="1"
+                                            Classes="muted"
+                                            Text="{Binding Badge}" />
+                                    </Grid>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <ScrollViewer Grid.Row="2" Margin="0,22,0,16">
+                    <StackPanel Spacing="4">
+                        <TextBlock
+                            Margin="10,0,0,6"
+                            Classes="muted"
+                            FontSize="11"
+                            FontWeight="SemiBold"
+                            Text="PROJECT" />
+
+                        <Border Classes="card" Padding="12">
+                            <StackPanel Spacing="4">
+                                <TextBlock FontWeight="SemiBold" Text="No repository selected" />
+                                <TextBlock
+                                    Classes="muted"
+                                    FontSize="12"
+                                    Text="Add a local repository to begin." />
+                            </StackPanel>
+                        </Border>
+
+                        <ItemsControl Margin="0,10,0,0" ItemsSource="{Binding RepositoryNavigation}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Classes="sidebar">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Text="{Binding Label}" />
+                                            <TextBlock
+                                                Grid.Column="1"
+                                                Classes="muted"
+                                                Text="{Binding Badge}" />
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <StackPanel Grid.Row="3" Spacing="8">
+                    <Button Classes="primary" Content="+ Add repository" />
+                    <TextBlock
+                        Classes="muted"
+                        FontSize="11"
+                        Text="{Binding GitVersion}"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Column="1" Margin="32,26" RowDefinitions="Auto,Auto,*">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="4">
+                    <TextBlock Classes="muted" FontSize="12" Text="OVERVIEW" />
+                    <TextBlock FontSize="28" FontWeight="SemiBold" Text="Welcome to GitGat" />
+                    <TextBlock
+                        Classes="muted"
+                        Text="Repositories, changes, pull requests, reviews, history and locks — in one calm workspace." />
+                </StackPanel>
+
+                <Button
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    Classes="primary"
+                    Content="Open repository" />
+            </Grid>
+
+            <Grid
+                Grid.Row="1"
+                Margin="0,28,0,24"
+                ColumnDefinitions="*,*,*,*"
+                ColumnSpacing="12">
+                <Border Grid.Column="0" Classes="card">
+                    <StackPanel Spacing="8">
+                        <TextBlock Classes="muted" Text="Changes" />
+                        <TextBlock FontSize="28" FontWeight="SemiBold" Text="0" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Classes="card">
+                    <StackPanel Spacing="8">
+                        <TextBlock Classes="muted" Text="Pull requests" />
+                        <TextBlock FontSize="28" FontWeight="SemiBold" Text="0" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Classes="card">
+                    <StackPanel Spacing="8">
+                        <TextBlock Classes="muted" Text="Reviews waiting" />
+                        <TextBlock FontSize="28" FontWeight="SemiBold" Text="0" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="3" Classes="card">
+                    <StackPanel Spacing="8">
+                        <TextBlock Classes="muted" Text="Locked files" />
+                        <TextBlock FontSize="28" FontWeight="SemiBold" Text="0" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Grid Grid.Row="2" ColumnDefinitions="2*,*" ColumnSpacing="14">
+                <Border Grid.Column="0" Classes="card">
+                    <StackPanel Spacing="18">
+                        <StackPanel Spacing="4">
+                            <TextBlock FontSize="17" FontWeight="SemiBold" Text="Recent activity" />
+                            <TextBlock
+                                Classes="muted"
+                                Text="Team and repository activity will appear here." />
+                        </StackPanel>
+
+                        <Border
+                            Padding="18,28"
+                            Background="{DynamicResource GitGatSurfaceRaisedBrush}"
+                            CornerRadius="10">
+                            <StackPanel HorizontalAlignment="Center" Spacing="6">
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    FontSize="16"
+                                    FontWeight="SemiBold"
+                                    Text="Nothing to show yet" />
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    Classes="muted"
+                                    Text="Open a repository and GitGat will build your activity view." />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1" Classes="card">
+                    <StackPanel Spacing="16">
+                        <TextBlock FontSize="17" FontWeight="SemiBold" Text="Quick actions" />
+                        <Button HorizontalContentAlignment="Left" Content="Open local repository" />
+                        <Button HorizontalContentAlignment="Left" Content="Clone from GitHub" />
+                        <Button HorizontalContentAlignment="Left" Content="Create workspace" />
+                        <Button HorizontalContentAlignment="Left" Content="Connect GitHub" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</suki:SukiWindow>
