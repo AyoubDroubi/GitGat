@@ -120,14 +120,15 @@ impl GitClient {
     pub fn push(&self, repo: &Path) -> Result<String> { self.runner.run("git", ["push"], Some(repo)) }
 
     pub fn branches(&self, repo: &Path) -> Result<Vec<BranchInfo>> {
-        let output = self.runner.run("git", ["for-each-ref", "--format=%(refname:short)|%(HEAD)|%(upstream:short)|%(objectname:short)", "refs/heads", "refs/remotes"], Some(repo))?;
+        let output = self.runner.run("git", ["for-each-ref", "--format=%(refname)|%(refname:short)|%(HEAD)|%(upstream:short)|%(objectname:short)", "refs/heads", "refs/remotes"], Some(repo))?;
         Ok(output.lines().filter_map(|line| {
             let mut parts = line.split('|');
+            let full_ref = parts.next()?;
             let name = parts.next()?.to_owned();
             let head = parts.next().unwrap_or_default();
             let upstream = parts.next().filter(|v| !v.is_empty()).map(str::to_owned);
             let commit = parts.next().filter(|v| !v.is_empty()).map(str::to_owned);
-            Some(BranchInfo { remote: name.contains("/HEAD") || name.starts_with("remotes/"), name, current: head == "*", upstream, commit })
+            Some(BranchInfo { remote: full_ref.starts_with("refs/remotes/"), name, current: head == "*", upstream, commit })
         }).collect())
     }
 
