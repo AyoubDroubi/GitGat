@@ -19,7 +19,5 @@
     <PackageReference Include="SukiUI" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
-    <PackageReference Include="Serilog.Extensions.Hosting" />
-    <PackageReference Include="Avalonia.Diagnostics" Condition="'$(Configuration)' == 'Debug'" />
-  </ItemGroup>
+    <PackageReference Include="Serilog.Extensions.Hosting" />  </ItemGroup>
 </Project>
