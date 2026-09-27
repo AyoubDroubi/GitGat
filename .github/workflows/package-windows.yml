@@ -22,6 +22,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: package-windows-rust-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   package:
     runs-on: windows-latest
