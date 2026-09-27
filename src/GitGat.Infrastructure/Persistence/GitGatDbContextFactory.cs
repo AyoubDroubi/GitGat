@@ -6,14 +6,25 @@ public sealed class GitGatDbContextFactory
 {
     private readonly DbContextOptions<GitGatDbContext> _options;
 
-    public GitGatDbContextFactory()
+    public GitGatDbContextFactory(string? databasePath = null)
     {
-        var root = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "GitGat");
+        if (string.IsNullOrWhiteSpace(databasePath))
+        {
+            var root = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "GitGat");
 
-        Directory.CreateDirectory(root);
-        var databasePath = Path.Combine(root, "gitgat.db");
+            Directory.CreateDirectory(root);
+            databasePath = Path.Combine(root, "gitgat.db");
+        }
+        else
+        {
+            var directory = Path.GetDirectoryName(Path.GetFullPath(databasePath));
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+        }
 
         _options = new DbContextOptionsBuilder<GitGatDbContext>()
             .UseSqlite($"Data Source={databasePath}")
