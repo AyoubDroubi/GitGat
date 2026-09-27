@@ -41,7 +41,19 @@ internal sealed class GhProcessRunner
 
         var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
         var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+
+            throw;
+        }
 
         return (
             process.ExitCode,
@@ -56,8 +68,14 @@ internal sealed class GhProcessRunner
             return value;
         }
 
-        return Regex.Replace(
+        var sanitized = Regex.Replace(
             value,
+            @"https://[^\s/@:]+:[^\s/@]+@",
+            "https://[REDACTED]@",
+            RegexOptions.CultureInvariant);
+
+        return Regex.Replace(
+            sanitized,
             @"(?:ghp|github_pat)_[A-Za-z0-9_]+",
             "[REDACTED]",
             RegexOptions.CultureInvariant);
