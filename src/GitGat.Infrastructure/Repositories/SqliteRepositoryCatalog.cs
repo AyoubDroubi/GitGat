@@ -22,13 +22,16 @@ public sealed class SqliteRepositoryCatalog(GitGatDbContextFactory factory) : IR
                 EF.Functions.Like(item.LocalPath, $"%{value}%"));
         }
 
-        var rows = await query
+        // SQLite cannot translate ORDER BY over DateTimeOffset reliably.
+        // Filter in SQL, then order the small local repository catalog in memory.
+        var rows = await query.ToListAsync(cancellationToken);
+
+        return rows
             .OrderByDescending(item => item.IsFavorite)
             .ThenByDescending(item => item.LastOpenedUtc)
             .Take(250)
-            .ToListAsync(cancellationToken);
-
-        return rows.Select(ToDomain).ToArray();
+            .Select(ToDomain)
+            .ToArray();
     }
 
     public async Task AddOrUpdateAsync(
