@@ -487,4 +487,41 @@ mod tests {
         client.checkout_branch(&repo, "feature/test").unwrap();
         assert_eq!(client.status(&repo).unwrap().branch, "feature/test");
     }
+
+    #[test]
+    fn blocks_branch_switch_when_worktree_is_dirty() {
+        let (root, client) = client();
+        let repo = root.path().join("repo");
+        std::fs::create_dir_all(&repo).unwrap();
+        git(&repo, &["init"]);
+        git(&repo, &["config", "user.email", "test@example.com"]);
+        git(&repo, &["config", "user.name", "GitGat Test"]);
+        std::fs::write(repo.join("a.txt"), "one").unwrap();
+        git(&repo, &["add", "."]);
+        git(&repo, &["commit", "-m", "initial"]);
+        client.create_branch(&repo, "other").unwrap();
+        std::fs::write(repo.join("a.txt"), "dirty").unwrap();
+
+        let error = client.checkout_branch(&repo, "other").unwrap_err();
+        assert!(error.to_string().contains("clean working tree"));
+        assert_ne!(client.status(&repo).unwrap().branch, "other");
+    }
+
+    #[test]
+    fn blocks_hard_reset_when_worktree_is_dirty() {
+        let (root, client) = client();
+        let repo = root.path().join("repo");
+        std::fs::create_dir_all(&repo).unwrap();
+        git(&repo, &["init"]);
+        git(&repo, &["config", "user.email", "test@example.com"]);
+        git(&repo, &["config", "user.name", "GitGat Test"]);
+        std::fs::write(repo.join("a.txt"), "one").unwrap();
+        git(&repo, &["add", "."]);
+        git(&repo, &["commit", "-m", "initial"]);
+        std::fs::write(repo.join("a.txt"), "dirty").unwrap();
+
+        let error = client.reset(&repo, "HEAD", super::ResetMode::Hard).unwrap_err();
+        assert!(error.to_string().contains("clean working tree"));
+        assert_eq!(std::fs::read_to_string(repo.join("a.txt")).unwrap(), "dirty");
+    }
 }
