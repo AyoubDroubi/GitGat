@@ -11,6 +11,7 @@ public interface IForgeClient
     Task CommentOnPullRequestAsync(ForgeRepository repository, int number, string body, CancellationToken cancellationToken = default);
     Task ReviewPullRequestAsync(ForgeRepository repository, int number, PullRequestReviewAction action, string? body, CancellationToken cancellationToken = default);
     Task<string> CreatePullRequestAsync(ForgeRepository repository, string head, string @base, string title, string body, CancellationToken cancellationToken = default);
+    Task EditPullRequestAsync(ForgeRepository repository, int number, string title, string body, CancellationToken cancellationToken = default);
     Task MergePullRequestAsync(ForgeRepository repository, int number, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<WorkflowRunSummary>> GetWorkflowRunsAsync(ForgeRepository repository, CancellationToken cancellationToken = default);
     Task<string> GetFailedWorkflowLogAsync(ForgeRepository repository, long runId, CancellationToken cancellationToken = default);
