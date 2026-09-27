@@ -142,6 +142,24 @@ public partial class MainWindowViewModel : ObservableObject
         WorktreePath = path;
     }
 
+    public Task UpdateActiveRepositoryPathAsync(string path) =>
+        ActiveRepository is null
+            ? Task.CompletedTask
+            : RunAsync("Updating repository location…", async () =>
+            {
+                var fullPath = Path.GetFullPath(path);
+                if (!await _git.IsRepositoryAsync(fullPath))
+                {
+                    throw new InvalidOperationException("The selected folder is not a Git repository.");
+                }
+
+                var repositoryId = ActiveRepository.Id;
+                await _repositories.UpdatePathAsync(repositoryId, fullPath);
+                await LoadRepositoriesAsync();
+                ActiveRepository = Repositories.FirstOrDefault(item => item.Id == repositoryId);
+                await LoadActiveRepositoryAsync();
+            });
+
     [RelayCommand]
     private Task SearchRepositoriesAsync() =>
         RunAsync("Searching repositories…", () => LoadRepositoriesAsync(RepositorySearch));
