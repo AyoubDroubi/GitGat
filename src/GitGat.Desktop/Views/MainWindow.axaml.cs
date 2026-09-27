@@ -33,6 +33,27 @@ public partial class MainWindow : SukiUI.Controls.SukiWindow
         }
     }
 
+    private async void UpdateRepositoryLocationClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel || !StorageProvider.CanPickFolder)
+        {
+            return;
+        }
+
+        var folders = await StorageProvider.OpenFolderPickerAsync(
+            new FolderPickerOpenOptions
+            {
+                Title = "Locate moved Git repository",
+                AllowMultiple = false
+            });
+
+        var path = folders.FirstOrDefault()?.TryGetLocalPath();
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            await viewModel.UpdateActiveRepositoryPathAsync(path);
+        }
+    }
+
     private async void PickCloneDestinationClicked(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not MainWindowViewModel viewModel || !StorageProvider.CanPickFolder)
