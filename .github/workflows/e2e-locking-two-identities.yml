@@ -1,0 +1,184 @@
+name: e2e-locking-two-identities
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  github-two-identities:
+    runs-on: ubuntu-latest
+    env:
+      USER_A_TOKEN: ${{ secrets.GITGAT_E2E_USER_A_TOKEN }}
+      USER_B_TOKEN: ${{ secrets.GITGAT_E2E_USER_B_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Require two distinct E2E credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${USER_A_TOKEN:-}" ] || [ -z "${USER_B_TOKEN:-}" ]; then
+            echo "::error::Configure GITGAT_E2E_USER_A_TOKEN and GITGAT_E2E_USER_B_TOKEN before running the two-identity gate."
+            exit 1
+          fi
+          A_LOGIN=$(GH_TOKEN="$USER_A_TOKEN" gh api user --jq .login)
+          B_LOGIN=$(GH_TOKEN="$USER_B_TOKEN" gh api user --jq .login)
+          test -n "$A_LOGIN"
+          test -n "$B_LOGIN"
+          if [ "$A_LOGIN" = "$B_LOGIN" ]; then
+            echo "::error::The two E2E tokens resolve to the same GitHub identity ($A_LOGIN)."
+            exit 1
+          fi
+          echo "A_LOGIN=$A_LOGIN" >> "$GITHUB_ENV"
+          echo "B_LOGIN=$B_LOGIN" >> "$GITHUB_ENV"
+          echo "Testing lock ownership between $A_LOGIN and $B_LOGIN"
+
+      - name: Prepare isolated credential stores and clones
+        id: fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          CRED_A="$RUNNER_TEMP/gitgat-e2e-a.credentials"
+          CRED_B="$RUNNER_TEMP/gitgat-e2e-b.credentials"
+          printf 'https://x-access-token:%s@github.com\n' "$USER_A_TOKEN" > "$CRED_A"
+          printf 'https://x-access-token:%s@github.com\n' "$USER_B_TOKEN" > "$CRED_B"
+
+          REPO_URL="https://github.com/$GITHUB_REPOSITORY.git"
+          CLONE_A="$RUNNER_TEMP/gitgat-user-a"
+          CLONE_B="$RUNNER_TEMP/gitgat-user-b"
+          BRANCH="e2e/locking-two-identities/$GITHUB_RUN_ID"
+          LOCK_PATH="e2e/two-identities-$GITHUB_RUN_ID.bin"
+
+          git -c "credential.helper=store --file=$CRED_A" clone "$REPO_URL" "$CLONE_A"
+          git -c "credential.helper=store --file=$CRED_B" clone "$REPO_URL" "$CLONE_B"
+          git -C "$CLONE_A" config credential.helper "store --file=$CRED_A"
+          git -C "$CLONE_B" config credential.helper "store --file=$CRED_B"
+
+          for clone in "$CLONE_A" "$CLONE_B"; do
+            git -C "$clone" lfs install --local
+            git -C "$clone" config lfs.setlockablereadonly true
+            git -C "$clone" config core.autocrlf false
+          done
+
+          git -C "$CLONE_A" config user.name "$A_LOGIN"
+          git -C "$CLONE_A" config user.email "gitgat-e2e-a@example.invalid"
+          git -C "$CLONE_B" config user.name "$B_LOGIN"
+          git -C "$CLONE_B" config user.email "gitgat-e2e-b@example.invalid"
+
+          echo "clone_a=$CLONE_A" >> "$GITHUB_OUTPUT"
+          echo "clone_b=$CLONE_B" >> "$GITHUB_OUTPUT"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "lock_path=$LOCK_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: User A creates protected fixture and acquires lock
+        shell: bash
+        env:
+          CLONE_A: ${{ steps.fixture.outputs.clone_a }}
+          BRANCH: ${{ steps.fixture.outputs.branch }}
+          LOCK_PATH: ${{ steps.fixture.outputs.lock_path }}
+        run: |
+          set -euo pipefail
+          git -C "$CLONE_A" fetch origin main
+          git -C "$CLONE_A" switch -c "$BRANCH" origin/main
+          mkdir -p "$CLONE_A/e2e"
+          (
+            cd "$CLONE_A"
+            git lfs track --lockable "$LOCK_PATH"
+            printf 'initial protected asset %s\n' "$GITHUB_RUN_ID" > "$LOCK_PATH"
+            git add .gitattributes "$LOCK_PATH"
+            git commit -m "test(e2e): two-identity lock fixture $GITHUB_RUN_ID"
+            git push -u origin "$BRANCH"
+            git lfs lock "$LOCK_PATH"
+            git lfs locks --verify --json | tee "$RUNNER_TEMP/a-locks.json"
+          )
+          jq -e --arg path "$LOCK_PATH" 'any(.ours[]?; .path == $path)' "$RUNNER_TEMP/a-locks.json"
+
+      - name: User B observes teammate lock and read-only materialization
+        shell: bash
+        env:
+          CLONE_B: ${{ steps.fixture.outputs.clone_b }}
+          BRANCH: ${{ steps.fixture.outputs.branch }}
+          LOCK_PATH: ${{ steps.fixture.outputs.lock_path }}
+        run: |
+          set -euo pipefail
+          git -C "$CLONE_B" fetch origin "$BRANCH"
+          (
+            cd "$CLONE_B"
+            git lfs locks --verify --json | tee "$RUNNER_TEMP/b-locks.json"
+            git switch -C "$BRANCH" "origin/$BRANCH"
+            git checkout -- "$LOCK_PATH"
+          )
+          jq -e --arg path "$LOCK_PATH" 'any(.theirs[]?; .path == $path)' "$RUNNER_TEMP/b-locks.json"
+          test ! -w "$CLONE_B/$LOCK_PATH"
+
+      - name: GitGat blocks User B Stage, Commit and Push bypasses
+        shell: bash
+        env:
+          GITGAT_LIVE_REPO: ${{ steps.fixture.outputs.clone_b }}
+          GITGAT_LIVE_LOCK_PATH: ${{ steps.fixture.outputs.lock_path }}
+        run: |
+          set -euo pipefail
+          cargo test --test live_lfs_identity teammate_lock_blocks_stage_commit_and_push -- --ignored --exact --nocapture
+
+      - name: User A unlocks and User B acquires ownership
+        shell: bash
+        env:
+          CLONE_A: ${{ steps.fixture.outputs.clone_a }}
+          CLONE_B: ${{ steps.fixture.outputs.clone_b }}
+          BRANCH: ${{ steps.fixture.outputs.branch }}
+          LOCK_PATH: ${{ steps.fixture.outputs.lock_path }}
+        run: |
+          set -euo pipefail
+          (
+            cd "$CLONE_A"
+            git lfs unlock "$LOCK_PATH"
+          )
+          git -C "$CLONE_B" reset --hard "origin/$BRANCH"
+          (
+            cd "$CLONE_B"
+            git lfs locks --verify --json >/dev/null
+            git checkout -- "$LOCK_PATH"
+            git lfs lock "$LOCK_PATH"
+            git lfs locks --verify --json | tee "$RUNNER_TEMP/b-owned-locks.json"
+          )
+          jq -e --arg path "$LOCK_PATH" 'any(.ours[]?; .path == $path)' "$RUNNER_TEMP/b-owned-locks.json"
+          test -w "$CLONE_B/$LOCK_PATH"
+
+      - name: GitGat allows User B normal flow once lock is owned
+        shell: bash
+        env:
+          GITGAT_LIVE_REPO: ${{ steps.fixture.outputs.clone_b }}
+          GITGAT_LIVE_LOCK_PATH: ${{ steps.fixture.outputs.lock_path }}
+        run: |
+          set -euo pipefail
+          cargo test --test live_lfs_identity owned_lock_allows_normal_gitgat_flow -- --ignored --exact --nocapture
+
+      - name: Cleanup live two-identity fixture
+        if: always()
+        shell: bash
+        env:
+          CLONE_A: ${{ steps.fixture.outputs.clone_a }}
+          CLONE_B: ${{ steps.fixture.outputs.clone_b }}
+          BRANCH: ${{ steps.fixture.outputs.branch }}
+          LOCK_PATH: ${{ steps.fixture.outputs.lock_path }}
+        run: |
+          set +e
+          for clone in "$CLONE_B" "$CLONE_A"; do
+            if [ -d "$clone/.git" ]; then
+              (
+                cd "$clone"
+                LOCK_ID=$(git lfs locks --json 2>/dev/null | jq -r --arg path "$LOCK_PATH" '.[]? | select(.path == $path) | .id' | head -n1)
+                if [ -n "$LOCK_ID" ]; then
+                  git lfs unlock --force --id="$LOCK_ID" || true
+                fi
+              )
+            fi
+          done
+          if [ -n "${BRANCH:-}" ]; then
+            GH_TOKEN="$USER_A_TOKEN" gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/$BRANCH" ||               GH_TOKEN="$USER_B_TOKEN" gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/$BRANCH" || true
+          fi
