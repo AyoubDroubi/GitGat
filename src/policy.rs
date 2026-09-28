@@ -72,7 +72,11 @@ impl LockPolicyChecker {
             .to_owned();
         let head_sha = self
             .runner
-            .run("git", ["rev-parse", "--verify", "HEAD^{commit}"], Some(repo))?
+            .run(
+                "git",
+                ["rev-parse", "--verify", "HEAD^{commit}"],
+                Some(repo),
+            )?
             .trim()
             .to_owned();
         let repository = self
@@ -159,7 +163,13 @@ impl LockPolicyChecker {
         let range = format!("{base}...HEAD");
         let output = self.runner.run(
             "git",
-            ["diff", "--name-only", "-z", "--diff-filter=ACDMRTUXB", &range],
+            [
+                "diff",
+                "--name-only",
+                "-z",
+                "--diff-filter=ACDMRTUXB",
+                &range,
+            ],
             Some(repo),
         )?;
         Ok(output
