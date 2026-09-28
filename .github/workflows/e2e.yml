@@ -19,6 +19,10 @@ permissions:
   pull-requests: write
   actions: read
 
+concurrency:
+  group: e2e-gitgat-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   local-git:
     if: github.event_name != 'pull_request'
@@ -59,6 +63,22 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY" --jq '.full_name'
           git lfs version
 
+      - name: Clean stale E2E resources
+        shell: bash
+        run: |
+          set -u
+          git lfs locks --json > /tmp/stale-locks.json || true
+          jq -r '.locks[]? | select(.path == "e2e/live-lock.bin" or (.path | startswith("e2e/live-lock-"))) | .id' /tmp/stale-locks.json |
+            while read -r lock_id; do
+              [ -n "$lock_id" ] && git lfs unlock --force --id="$lock_id" || true
+            done
+
+          gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/heads/e2e/" --jq '.[].ref' |
+            while read -r ref; do
+              [ -z "$ref" ] && continue
+              gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/${ref#refs/}" || true
+            done
+
       - name: Create isolated live branches
         id: branches
         shell: bash
@@ -66,8 +86,10 @@ jobs:
           set -euo pipefail
           BASE_BRANCH="e2e/${GITHUB_RUN_ID}/base"
           HEAD_BRANCH="e2e/${GITHUB_RUN_ID}/head"
+          LOCK_PATH="e2e/live-lock-${GITHUB_RUN_ID}.bin"
           echo "base=$BASE_BRANCH" >> "$GITHUB_OUTPUT"
           echo "head=$HEAD_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "lock_path=$LOCK_PATH" >> "$GITHUB_OUTPUT"
 
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
@@ -78,23 +100,25 @@ jobs:
 
           mkdir -p e2e
           git lfs install --local
-          git lfs track "e2e/live-lock.bin"
+          git lfs track "$LOCK_PATH"
           printf 'GitGat live GitHub E2E run %s\n' "$GITHUB_RUN_ID" > e2e/live.txt
-          printf 'lock validation %s\n' "$GITHUB_RUN_ID" > e2e/live-lock.bin
-          git add .gitattributes e2e/live.txt e2e/live-lock.bin
+          printf 'lock validation %s\n' "$GITHUB_RUN_ID" > "$LOCK_PATH"
+          git add .gitattributes e2e/live.txt "$LOCK_PATH"
           git commit -m "test(e2e): live GitHub validation $GITHUB_RUN_ID"
           git push -u origin "$HEAD_BRANCH"
 
       - name: Validate live Git LFS lock lifecycle
         shell: bash
+        env:
+          LOCK_PATH: ${{ steps.branches.outputs.lock_path }}
         run: |
           set -euo pipefail
-          git lfs lock e2e/live-lock.bin
+          git lfs lock "$LOCK_PATH"
           git lfs locks --json | tee /tmp/locks.json
-          jq -e 'any(.locks[]?; .path == "e2e/live-lock.bin")' /tmp/locks.json
-          git lfs unlock e2e/live-lock.bin
+          jq -e --arg path "$LOCK_PATH" 'any(.locks[]?; .path == $path)' /tmp/locks.json
+          git lfs unlock "$LOCK_PATH"
           git lfs locks --json | tee /tmp/locks-after.json
-          jq -e '([.locks[]? | select(.path == "e2e/live-lock.bin")] | length) == 0' /tmp/locks-after.json
+          jq -e --arg path "$LOCK_PATH" '([.locks[]? | select(.path == $path)] | length) == 0' /tmp/locks-after.json
 
       - name: Create and exercise live pull request
         id: pr
