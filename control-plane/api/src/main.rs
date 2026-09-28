@@ -1,4 +1,6 @@
+mod auth;
 mod config;
+mod rbac;
 mod routes;
 mod state;
 
@@ -27,7 +29,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     sqlx::migrate!("./migrations").run(&pool).await?;
 
-    let state = AppState::new(pool);
+    let (auth, auth_shutdown) = auth::AuthService::from_config(&config).await?;
+    info!(auth_mode = auth.label(), "authentication configured");
+
+    let state = AppState::new(pool, auth);
     let app = routes::router(state).layer(TraceLayer::new_for_http());
     let listener = TcpListener::bind(config.bind).await?;
 
@@ -35,6 +40,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await?;
+
+    if let Some(shutdown) = auth_shutdown {
+        shutdown.cancel();
+    }
     Ok(())
 }
 
