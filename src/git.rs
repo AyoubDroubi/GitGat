@@ -489,11 +489,9 @@ impl GitClient {
     }
 
     pub fn lfs_verified_locks(&self, repo: &Path) -> Result<Vec<LfsLock>> {
-        let output = self.runner.run(
-            "git",
-            ["lfs", "locks", "--verify", "--json"],
-            Some(repo),
-        )?;
+        let output = self
+            .runner
+            .run("git", ["lfs", "locks", "--verify", "--json"], Some(repo))?;
         parse_lfs_locks_json(&output)
     }
 
@@ -536,7 +534,8 @@ impl GitClient {
             .filter(|value| !value.is_empty())
             .ok_or_else(|| anyhow::anyhow!("Git LFS endpoint could not be discovered"))?;
         let key = format!("lfs.{endpoint}.locksverify");
-        self.runner.run("git", ["config", &key, "true"], Some(repo))?;
+        self.runner
+            .run("git", ["config", &key, "true"], Some(repo))?;
         Ok("Strict Git LFS locking enabled: lockable files are read-only unless owned, and push lock verification is required.".to_owned())
     }
 
@@ -578,11 +577,9 @@ impl GitClient {
     }
 
     fn staged_paths(&self, repo: &Path) -> Result<Vec<String>> {
-        let output = self.runner.run(
-            "git",
-            ["diff", "--cached", "--name-only", "-z"],
-            Some(repo),
-        )?;
+        let output =
+            self.runner
+                .run("git", ["diff", "--cached", "--name-only", "-z"], Some(repo))?;
         Ok(output
             .split('\0')
             .filter(|path| !path.is_empty())
@@ -609,21 +606,21 @@ impl GitClient {
             match lock.map(|lock| lock.ownership) {
                 Some(LfsLockOwnership::Ours) => {}
                 Some(LfsLockOwnership::Theirs) => {
-                    let owner = lock.map(|value| value.owner.as_str()).unwrap_or("another user");
+                    let owner = lock
+                        .map(|value| value.owner.as_str())
+                        .unwrap_or("another user");
                     bail!("{path} is locked by {owner}; GitGat will not stage or commit it");
                 }
-                _ => bail!("{path} is lockable and must be locked by you before staging or committing"),
+                _ => bail!(
+                    "{path} is lockable and must be locked by you before staging or committing"
+                ),
             }
         }
         Ok(())
     }
 
     fn repository_has_lockable_patterns(&self, repo: &Path) -> Result<bool> {
-        let output = self.runner.run(
-            "git",
-            ["ls-files", "-z"],
-            Some(repo),
-        )?;
+        let output = self.runner.run("git", ["ls-files", "-z"], Some(repo))?;
         for path in output.split('\0').filter(|path| !path.is_empty()) {
             if path == ".gitattributes" || path.ends_with("/.gitattributes") {
                 let full = repo.join(path);
@@ -711,11 +708,7 @@ fn string_at(value: &Value, path: &[&str]) -> String {
     current.as_str().unwrap_or_default().to_owned()
 }
 
-fn append_lfs_locks(
-    result: &mut Vec<LfsLock>,
-    locks: &[Value],
-    ownership: LfsLockOwnership,
-) {
+fn append_lfs_locks(result: &mut Vec<LfsLock>, locks: &[Value], ownership: LfsLockOwnership) {
     for lock in locks {
         result.push(LfsLock {
             id: string_at(lock, &["id"]),
