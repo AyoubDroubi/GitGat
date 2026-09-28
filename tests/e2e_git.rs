@@ -39,6 +39,12 @@ fn configure_identity(repo: &Path) {
     );
     git(repo, &["config", "user.name", "GitGat E2E"]);
     git(repo, &["config", "core.autocrlf", "false"]);
+    if command(repo, &["rev-parse", "--verify", "HEAD"])
+        .status
+        .success()
+    {
+        git(repo, &["reset", "--hard", "HEAD"]);
+    }
 }
 
 fn write(path: &Path, content: &str) {
