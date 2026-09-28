@@ -716,9 +716,7 @@ fn ensure_lock_ownership(paths: &[String], locks: &[LfsLock]) -> Result<()> {
                     .unwrap_or("another user");
                 bail!("{path} is locked by {owner}; GitGat will not stage or commit it");
             }
-            _ => bail!(
-                "{path} is lockable and must be locked by you before staging or committing"
-            ),
+            _ => bail!("{path} is lockable and must be locked by you before staging or committing"),
         }
     }
     Ok(())
