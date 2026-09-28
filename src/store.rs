@@ -137,7 +137,10 @@ impl Catalog {
         }
         connection.execute(
             "UPDATE workspace_repositories SET repository_path=?2 WHERE repository_path=?1",
-            params![normalized_old.to_string_lossy(), canonical_new.to_string_lossy()],
+            params![
+                normalized_old.to_string_lossy(),
+                canonical_new.to_string_lossy()
+            ],
         )?;
         Ok(())
     }
