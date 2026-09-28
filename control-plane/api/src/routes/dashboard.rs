@@ -1,11 +1,17 @@
-use crate::state::AppState;
+use crate::{
+    auth::AuthIdentity,
+    rbac::{Permission, require_permission},
+    routes::organizations::access_error,
+    state::AppState,
+};
 use axum::{
-    Json,
-    extract::State,
+    Extension, Json,
+    extract::{Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
 };
 use serde::Serialize;
+use uuid::Uuid;
 
 #[derive(Debug, Serialize)]
 pub struct DashboardSummary {
@@ -19,20 +25,77 @@ pub struct DashboardSummary {
     audit_events: i64,
 }
 
-pub async fn summary(State(state): State<AppState>) -> Response {
+pub async fn summary(
+    State(state): State<AppState>,
+    Path(organization_id): Path<Uuid>,
+    Extension(identity): Extension<AuthIdentity>,
+) -> Response {
+    if let Err(error) = require_permission(
+        &state.database,
+        &identity,
+        organization_id,
+        Permission::ViewOrganization,
+    )
+    .await
+    {
+        return access_error(error);
+    }
+
     let query = sqlx::query_as::<_, (i64, i64, i64, i64, i64, i64, i64, i64)>(
         r#"
         SELECT
-            (SELECT count(*) FROM organizations),
-            (SELECT count(*) FROM repository_registrations WHERE enabled = true),
-            (SELECT count(*) FROM provider_connections WHERE status <> 'revoked'),
-            (SELECT count(*) FROM lock_observations WHERE verification_state = 'verified'),
-            (SELECT count(*) FROM lock_observations WHERE verification_state = 'stale'),
-            (SELECT count(*) FROM force_unlock_requests WHERE status = 'pending'),
-            (SELECT count(*) FROM policy_exceptions WHERE revoked_at IS NULL AND expires_at > now()),
-            (SELECT count(*) FROM audit_events)
+            1::bigint,
+            (
+                SELECT count(*)
+                FROM repository_registrations
+                WHERE organization_id = $1 AND enabled = true
+            ),
+            (
+                SELECT count(*)
+                FROM provider_connections
+                WHERE organization_id = $1 AND status <> 'revoked'
+            ),
+            (
+                SELECT count(*)
+                FROM lock_observations observation
+                INNER JOIN repository_registrations repository
+                    ON repository.id = observation.repository_id
+                WHERE repository.organization_id = $1
+                  AND observation.verification_state = 'verified'
+            ),
+            (
+                SELECT count(*)
+                FROM lock_observations observation
+                INNER JOIN repository_registrations repository
+                    ON repository.id = observation.repository_id
+                WHERE repository.organization_id = $1
+                  AND observation.verification_state = 'stale'
+            ),
+            (
+                SELECT count(*)
+                FROM force_unlock_requests request
+                INNER JOIN repository_registrations repository
+                    ON repository.id = request.repository_id
+                WHERE repository.organization_id = $1
+                  AND request.status = 'pending'
+            ),
+            (
+                SELECT count(*)
+                FROM policy_exceptions exception
+                INNER JOIN repository_registrations repository
+                    ON repository.id = exception.repository_id
+                WHERE repository.organization_id = $1
+                  AND exception.revoked_at IS NULL
+                  AND exception.expires_at > now()
+            ),
+            (
+                SELECT count(*)
+                FROM audit_events
+                WHERE organization_id = $1
+            )
         "#,
     )
+    .bind(organization_id)
     .fetch_one(&state.database)
     .await;
 
@@ -58,7 +121,7 @@ pub async fn summary(State(state): State<AppState>) -> Response {
         })
         .into_response(),
         Err(error) => {
-            tracing::error!(%error, "failed to load dashboard summary");
+            tracing::error!(%error, %organization_id, "failed to load dashboard summary");
             (
                 StatusCode::SERVICE_UNAVAILABLE,
                 Json(serde_json::json!({
