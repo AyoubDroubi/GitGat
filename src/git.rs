@@ -926,7 +926,9 @@ mod tests {
             ownership: LfsLockOwnership::Theirs,
         };
 
-        assert!(ensure_lock_ownership(&["Assets/a.psd".to_owned()], &[ours.clone()]).is_ok());
+        assert!(
+            ensure_lock_ownership(&["Assets/a.psd".to_owned()], std::slice::from_ref(&ours)).is_ok()
+        );
 
         let theirs_error =
             ensure_lock_ownership(&["Assets/b.psd".to_owned()], &[ours.clone(), theirs])
