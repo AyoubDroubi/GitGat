@@ -9,8 +9,12 @@ pub struct Config {
 
 impl Config {
     pub fn from_env() -> Result<Self, Box<dyn std::error::Error>> {
-        let database_url = std::env::var("GITGAT_DATABASE_URL")
-            .map_err(|_| "GITGAT_DATABASE_URL is required")?;
+        let database_url = std::env::var("GITGAT_DATABASE_URL").map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "GITGAT_DATABASE_URL is required",
+            )
+        })?;
         let bind = std::env::var("GITGAT_BIND")
             .unwrap_or_else(|_| "127.0.0.1:8080".to_owned())
             .parse()?;
