@@ -653,6 +653,10 @@ impl GitGatApp {
             return;
         };
 
+        if let Ok(Some(warning)) = self.forge.lfs_transport_warning(&repo) {
+            ui.label(RichText::new(warning).strong());
+        }
+
         ui.label("Protected file patterns");
         ui.horizontal(|ui| {
             ui.add(
