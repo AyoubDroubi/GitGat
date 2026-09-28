@@ -37,5 +37,29 @@ User B refreshes/pulls -> acquires lock -> file becomes writable -> can Stage/Co
 ## Acceptance
 The second identity cannot accidentally complete a protected-file workflow while another identity owns the lock.
 
+## Implementation started
+
+Added:
+- `.github/workflows/e2e-locking-two-identities.yml`
+- `tests/live_lfs_identity.rs`
+
+The live gate requires two separate GitHub identities through:
+- `GITGAT_E2E_USER_A_TOKEN`
+- `GITGAT_E2E_USER_B_TOKEN`
+
+The harness explicitly tests:
+- teammate lock appears as `Theirs`;
+- protected file is read-only for the teammate;
+- manual permission bypass does not let GitGat Stage succeed;
+- raw `git add` does not let GitGat Commit succeed;
+- raw Stage + raw Commit still hit strict Push verification;
+- after owner unlocks, the second identity can acquire the lock and complete the normal GitGat flow.
+
+## Remaining before DONE
+- configure the two live GitHub identities and record a passing run;
+- extend the live identity matrix to Azure DevOps;
+- add Windows/macOS live read-only evidence where provider credentials allow;
+- execute the defined auth/network/stale-lock failure scenarios.
+
 ## Evidence
-Store workflow run IDs, fixture repositories and screenshots/log excerpts in this TODO.
+Store workflow run IDs, fixture repositories and diagnostic excerpts in this TODO.
