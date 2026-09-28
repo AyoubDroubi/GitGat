@@ -35,9 +35,12 @@ fn make_writable(path: &Path) {
 
     #[cfg(windows)]
     {
-        let mut permissions = std::fs::metadata(path).unwrap().permissions();
-        permissions.set_readonly(false);
-        std::fs::set_permissions(path, permissions).unwrap();
+        let status = Command::new("attrib")
+            .arg("-R")
+            .arg(path)
+            .status()
+            .expect("attrib should start");
+        assert!(status.success(), "attrib -R should make the fixture writable");
     }
 }
 
