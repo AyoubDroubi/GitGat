@@ -927,7 +927,8 @@ mod tests {
         };
 
         assert!(
-            ensure_lock_ownership(&["Assets/a.psd".to_owned()], std::slice::from_ref(&ours)).is_ok()
+            ensure_lock_ownership(&["Assets/a.psd".to_owned()], std::slice::from_ref(&ours))
+                .is_ok()
         );
 
         let theirs_error =
