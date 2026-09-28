@@ -28,7 +28,7 @@ Production: reserved and untouched
 | RUST-017 | Azure DevOps Repos/PRs/Pipelines integration | IN PROGRESS | implementation present; authenticated Azure live E2E pending |
 | RUST-018 | Provider-side required lock-policy check before merge | IN PROGRESS | policy engine + GitHub workflow + Azure template; live required-policy gates pending |
 | RUST-019 | GitGat Control Plane / admin portal foundation | IN PROGRESS | Axum + PostgreSQL + React foundation; CI gate pending |
-| RUST-020 | Identity, organizations, teams and RBAC | TODO | tenant isolation + permission tests |
+| RUST-020 | Identity, organizations, teams and RBAC | IN PROGRESS | OIDC + org-scoped RBAC implementation; CI/integration gate pending |
 | RUST-021 | Repository enrollment, provider connections and webhooks | TODO | live enrollment + signed webhook E2E |
 | RUST-022 | Lock policy and protected-pattern management | TODO | policy CRUD + drift/reconciliation PR |
 | RUST-023 | Organization-wide active lock dashboard | TODO | provider-verified lock reconciliation |
