@@ -1,4 +1,10 @@
-import type { DashboardSummary, Health, ServiceMeta } from './types'
+import type {
+  CurrentIdentity,
+  DashboardSummary,
+  Health,
+  OrganizationSummary,
+  ServiceMeta,
+} from './types'
 
 async function readJson<T>(path: string): Promise<T> {
   const response = await fetch(path, {
@@ -16,5 +22,10 @@ async function readJson<T>(path: string): Promise<T> {
 export const controlPlaneApi = {
   meta: () => readJson<ServiceMeta>('/api/v1/meta'),
   health: () => readJson<Health>('/health/ready'),
-  summary: () => readJson<DashboardSummary>('/api/v1/dashboard/summary'),
+  me: () => readJson<CurrentIdentity>('/api/v1/me'),
+  organizations: () => readJson<OrganizationSummary[]>('/api/v1/organizations'),
+  summary: (organizationId: string) =>
+    readJson<DashboardSummary>(
+      `/api/v1/organizations/${encodeURIComponent(organizationId)}/dashboard/summary`,
+    ),
 }
