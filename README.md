@@ -1,6 +1,6 @@
 # GitGat
 
-GitGat is a native desktop Git and GitHub workspace written in Rust.
+GitGat is a native desktop Git workspace for GitHub and Azure DevOps, written in Rust.
 
 ## Current architecture
 
@@ -8,7 +8,7 @@ GitGat is a native desktop Git and GitHub workspace written in Rust.
 - eframe + egui native desktop UI
 - system Git CLI as repository source of truth
 - Git LFS CLI for lock workflows
-- GitHub CLI as the authenticated GitHub adapter
+- provider facade: GitHub CLI for GitHub and Azure CLI + Azure DevOps extension for Azure Repos/Pipelines
 - SQLite via rusqlite for GitGat-only local state
 - Inno Setup for the Windows installer
 
@@ -25,7 +25,7 @@ GitGat chooses safe Git behavior over shortcuts:
 - branch switching and history-changing operations are guarded;
 - destructive advanced actions require typed confirmation;
 - risky history actions are written to an operation journal;
-- GitHub tokens are never persisted by GitGat.
+- GitHub tokens and Azure DevOps PATs are never persisted by GitGat.
 
 ## Develop
 
