@@ -40,7 +40,10 @@ fn make_writable(path: &Path) {
             .arg(path)
             .status()
             .expect("attrib should start");
-        assert!(status.success(), "attrib -R should make the fixture writable");
+        assert!(
+            status.success(),
+            "attrib -R should make the fixture writable"
+        );
     }
 }
 
