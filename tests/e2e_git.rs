@@ -38,6 +38,7 @@ fn configure_identity(repo: &Path) {
         &["config", "user.email", "gitgat-e2e@example.invalid"],
     );
     git(repo, &["config", "user.name", "GitGat E2E"]);
+    git(repo, &["config", "core.autocrlf", "false"]);
 }
 
 fn write(path: &Path, content: &str) {
