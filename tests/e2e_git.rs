@@ -360,12 +360,14 @@ fn end_to_end_local_git_and_catalog_flow() {
     client
         .add_worktree(&repo, &worktree_path, "worktree-e2e")
         .unwrap();
+    let expected_worktree = worktree_path.canonicalize().unwrap();
     assert!(
         client
             .worktrees(&repo)
             .unwrap()
             .iter()
-            .any(|item| item.path == worktree_path)
+            .filter_map(|item| item.path.canonicalize().ok())
+            .any(|path| path == expected_worktree)
     );
     client.remove_worktree(&repo, &worktree_path).unwrap();
     assert!(!worktree_path.exists());
