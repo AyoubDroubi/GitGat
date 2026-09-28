@@ -39,10 +39,10 @@ fn configure_identity(repo: &Path) {
     );
     git(repo, &["config", "user.name", "GitGat E2E"]);
     git(repo, &["config", "core.autocrlf", "false"]);
-    if command(repo, &["rev-parse", "--verify", "HEAD"])
+    let has_head = command(repo, &["rev-parse", "--verify", "HEAD"])
         .status
-        .success()
-    {
+        .success();
+    if has_head {
         git(repo, &["reset", "--hard", "HEAD"]);
     }
 }
