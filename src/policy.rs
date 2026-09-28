@@ -27,7 +27,10 @@ pub struct LockPolicyViolation {
 pub struct LockPolicyReport {
     pub status: LockPolicyStatus,
     pub actor: String,
+    pub repository: String,
     pub base: String,
+    pub base_sha: String,
+    pub head_sha: String,
     pub protected_paths: Vec<String>,
     pub violations: Vec<LockPolicyViolation>,
 }
@@ -57,11 +60,25 @@ impl LockPolicyChecker {
             bail!("lock-policy actor is required");
         }
 
-        self.runner.run(
-            "git",
-            ["rev-parse", "--verify", &format!("{base}^{{commit}}")],
-            Some(repo),
-        )?;
+        let base_sha = self
+            .runner
+            .run(
+                "git",
+                ["rev-parse", "--verify", &format!("{base}^{{commit}}")],
+                Some(repo),
+            )?
+            .trim()
+            .to_owned();
+        let head_sha = self
+            .runner
+            .run("git", ["rev-parse", "--verify", "HEAD^{commit}"], Some(repo))?
+            .trim()
+            .to_owned();
+        let repository = self
+            .runner
+            .run("git", ["remote", "get-url", "origin"], Some(repo))
+            .map(|value| value.trim().to_owned())
+            .unwrap_or_default();
 
         let changed = self.changed_paths(repo, base)?;
         let mut protected = Vec::new();
@@ -72,7 +89,11 @@ impl LockPolicyChecker {
         }
 
         if protected.is_empty() {
-            return Ok(evaluate_lock_policy(base, actor, &protected, &[]));
+            let mut report = evaluate_lock_policy(base, actor, &protected, &[]);
+            report.repository = repository;
+            report.base_sha = base_sha;
+            report.head_sha = head_sha;
+            return Ok(report);
         }
 
         let (ok, output) =
@@ -82,7 +103,10 @@ impl LockPolicyChecker {
             return Ok(LockPolicyReport {
                 status: LockPolicyStatus::FailPolicyUnavailable,
                 actor: actor.to_owned(),
+                repository,
                 base: base.to_owned(),
+                base_sha,
+                head_sha,
                 protected_paths: protected.clone(),
                 violations: protected
                     .into_iter()
@@ -97,7 +121,11 @@ impl LockPolicyChecker {
         }
 
         let locks = parse_lfs_locks_json(&output)?;
-        Ok(evaluate_lock_policy(base, actor, &protected, &locks))
+        let mut report = evaluate_lock_policy(base, actor, &protected, &locks);
+        report.repository = repository;
+        report.base_sha = base_sha;
+        report.head_sha = head_sha;
+        Ok(report)
     }
 
     fn changed_paths(&self, repo: &Path, base: &str) -> Result<Vec<String>> {
@@ -141,7 +169,10 @@ pub fn evaluate_lock_policy(
         return LockPolicyReport {
             status: LockPolicyStatus::NotApplicable,
             actor: actor.to_owned(),
+            repository: String::new(),
             base: base.to_owned(),
+            base_sha: String::new(),
+            head_sha: String::new(),
             protected_paths: Vec::new(),
             violations: Vec::new(),
         };
@@ -190,7 +221,10 @@ pub fn evaluate_lock_policy(
     LockPolicyReport {
         status,
         actor: actor.to_owned(),
+        repository: String::new(),
         base: base.to_owned(),
+        base_sha: String::new(),
+        head_sha: String::new(),
         protected_paths: protected_paths.to_vec(),
         violations,
     }
