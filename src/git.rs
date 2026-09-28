@@ -46,7 +46,8 @@ impl GitClient {
         let value = self
             .runner
             .run("git", ["rev-parse", "--show-toplevel"], Some(path))?;
-        Ok(PathBuf::from(value.trim()))
+        let root = PathBuf::from(value.trim());
+        Ok(root.canonicalize().unwrap_or(root))
     }
 
     pub fn clone_repository(&self, url: &str, destination: &Path) -> Result<PathBuf> {
