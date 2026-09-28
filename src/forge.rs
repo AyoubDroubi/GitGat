@@ -310,9 +310,10 @@ impl ForgeClient {
 
     pub fn rerun_workflow(&self, repo: &Path, id: u64) -> Result<String> {
         match self.provider(repo)? {
-            ForgeProviderKind::GitHub => self
-                .runner
-                .run("gh", ["run", "rerun", &id.to_string()], Some(repo)),
+            ForgeProviderKind::GitHub => {
+                self.runner
+                    .run("gh", ["run", "rerun", &id.to_string()], Some(repo))
+            }
             ForgeProviderKind::AzureDevOps => {
                 let identity = self.azure_identity(repo)?;
                 let run = self.runner.run(
@@ -352,10 +353,7 @@ impl ForgeClient {
                     "json".to_owned(),
                 ];
                 if !branch.is_empty() {
-                    args.extend([
-                        "--branch".to_owned(),
-                        strip_ref_prefix(&branch).to_owned(),
-                    ]);
+                    args.extend(["--branch".to_owned(), strip_ref_prefix(&branch).to_owned()]);
                 }
                 self.runner.run("az", args, Some(repo))
             }
@@ -497,22 +495,16 @@ impl ForgeClient {
 
     fn azure_auth_status(&self, repo: &Path) -> Result<(bool, Option<String>)> {
         self.require_azure_https(repo)?;
-        let (ok, output) = self.runner.run_allow_failure(
-            "az",
-            ["account", "show", "--output", "json"],
-            None,
-        )?;
+        let (ok, output) =
+            self.runner
+                .run_allow_failure("az", ["account", "show", "--output", "json"], None)?;
         if !ok {
             return Ok((false, None));
         }
         let value: Value = serde_json::from_str(&output).unwrap_or(Value::Null);
         let account = text_at_any(
             &value,
-            &[
-                &["user", "name"],
-                &["user", "displayName"],
-                &["name"],
-            ],
+            &[&["user", "name"], &["user", "displayName"], &["name"]],
         );
         Ok((true, nonempty(&account)))
     }
@@ -569,11 +561,7 @@ impl ForgeClient {
                 let number = value["pullRequestId"].as_u64().unwrap_or_default();
                 let url = text_at_any(
                     &value,
-                    &[
-                        &["_links", "web", "href"],
-                        &["remoteUrl"],
-                        &["url"],
-                    ],
+                    &[&["_links", "web", "href"], &["remoteUrl"], &["url"]],
                 );
                 PullRequestInfo {
                     number,
@@ -581,10 +569,7 @@ impl ForgeClient {
                     state: text(&value["status"]),
                     author: text_at_any(
                         &value,
-                        &[
-                            &["createdBy", "displayName"],
-                            &["createdBy", "uniqueName"],
-                        ],
+                        &[&["createdBy", "displayName"], &["createdBy", "uniqueName"]],
                     ),
                     head: strip_ref_prefix(&text(&value["sourceRefName"])).to_owned(),
                     base: strip_ref_prefix(&text(&value["targetRefName"])).to_owned(),
@@ -621,29 +606,15 @@ impl ForgeClient {
                 id: value["id"].as_u64().unwrap_or_default(),
                 name: text_at_any(
                     &value,
-                    &[
-                        &["definition", "name"],
-                        &["buildNumber"],
-                        &["name"],
-                    ],
+                    &[&["definition", "name"], &["buildNumber"], &["name"]],
                 ),
                 status: text(&value["status"]),
                 conclusion: text_at_any(&value, &[&["result"], &["conclusion"]]),
                 branch: strip_ref_prefix(&text(&value["sourceBranch"])).to_owned(),
-                url: text_at_any(
-                    &value,
-                    &[
-                        &["_links", "web", "href"],
-                        &["url"],
-                    ],
-                ),
+                url: text_at_any(&value, &[&["_links", "web", "href"], &["url"]]),
                 created_at: text_at_any(
                     &value,
-                    &[
-                        &["queueTime"],
-                        &["startTime"],
-                        &["createdDate"],
-                    ],
+                    &[&["queueTime"], &["startTime"], &["createdDate"]],
                 ),
             })
             .collect())
@@ -792,7 +763,10 @@ impl ForgeClient {
             let _ = fs::remove_file(out);
         }
         if combined.trim().is_empty() {
-            Ok("Azure Pipeline logs are available, but no text log content could be decoded.".to_owned())
+            Ok(
+                "Azure Pipeline logs are available, but no text log content could be decoded."
+                    .to_owned(),
+            )
         } else {
             Ok(combined)
         }
@@ -863,7 +837,11 @@ pub fn parse_azure_remote(url: &str) -> Option<AzureRepoIdentity> {
         let organization = parts.next()?.to_owned();
         let project = parts.next()?.to_owned();
         let repository = parts.next()?.to_owned();
-        if organization.is_empty() || project.is_empty() || repository.is_empty() || parts.next().is_some() {
+        if organization.is_empty()
+            || project.is_empty()
+            || repository.is_empty()
+            || parts.next().is_some()
+        {
             return None;
         }
         return Some(AzureRepoIdentity {
@@ -878,23 +856,22 @@ pub fn parse_azure_remote(url: &str) -> Option<AzureRepoIdentity> {
     let https = trimmed
         .strip_prefix("https://")
         .or_else(|| trimmed.strip_prefix("http://"))?;
+    let (raw_host, path) = https.split_once('/')?;
+    let host = raw_host.rsplit('@').next().unwrap_or(raw_host);
 
-    if let Some(rest) = https.split_once("dev.azure.com/").map(|(_, rest)| rest) {
-        let mut parts = rest.split('/');
-        let organization = strip_optional_user(parts.next()?);
-        let mut organization = organization.to_owned();
-
-        // Credential-style URLs may be user@dev.azure.com/org/...
-        if organization.contains('@') {
-            organization = parts.next()?.to_owned();
-        }
-
+    if host.eq_ignore_ascii_case("dev.azure.com") {
+        let mut parts = path.split('/');
+        let organization = parts.next()?.to_owned();
         let project = parts.next()?.to_owned();
         if parts.next()? != "_git" {
             return None;
         }
         let repository = parts.next()?.to_owned();
-        if organization.is_empty() || project.is_empty() || repository.is_empty() || parts.next().is_some() {
+        if organization.is_empty()
+            || project.is_empty()
+            || repository.is_empty()
+            || parts.next().is_some()
+        {
             return None;
         }
         return Some(AzureRepoIdentity {
@@ -906,8 +883,6 @@ pub fn parse_azure_remote(url: &str) -> Option<AzureRepoIdentity> {
         });
     }
 
-    let host_and_path = https;
-    let (host, path) = host_and_path.split_once('/')?;
     if let Some(organization) = host.strip_suffix(".visualstudio.com") {
         let mut parts = path.split('/');
         let project = parts.next()?.to_owned();
@@ -915,7 +890,11 @@ pub fn parse_azure_remote(url: &str) -> Option<AzureRepoIdentity> {
             return None;
         }
         let repository = parts.next()?.to_owned();
-        if organization.is_empty() || project.is_empty() || repository.is_empty() || parts.next().is_some() {
+        if organization.is_empty()
+            || project.is_empty()
+            || repository.is_empty()
+            || parts.next().is_some()
+        {
             return None;
         }
         return Some(AzureRepoIdentity {
@@ -928,10 +907,6 @@ pub fn parse_azure_remote(url: &str) -> Option<AzureRepoIdentity> {
     }
 
     None
-}
-
-fn strip_optional_user(value: &str) -> &str {
-    value.rsplit('@').next().unwrap_or(value)
 }
 
 fn current_branch(runner: &ProcessRunner, repo: &Path) -> Result<String> {
@@ -991,8 +966,12 @@ fn nonempty(value: &str) -> Option<String> {
 fn temporary_json(prefix: &str, value: &Value) -> Result<PathBuf> {
     let path = temporary_path(prefix, "json");
     let data = serde_json::to_vec(value)?;
-    fs::write(&path, data)
-        .with_context(|| format!("failed to create temporary Azure DevOps request {}", path.display()))?;
+    fs::write(&path, data).with_context(|| {
+        format!(
+            "failed to create temporary Azure DevOps request {}",
+            path.display()
+        )
+    })?;
     Ok(path)
 }
 
@@ -1009,9 +988,7 @@ fn temporary_path(prefix: &str, extension: &str) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        ForgeProviderKind, detect_provider, parse_azure_remote, parse_github_remote,
-    };
+    use super::{ForgeProviderKind, detect_provider, parse_azure_remote, parse_github_remote};
 
     #[test]
     fn maps_common_github_remote_formats() {
@@ -1036,10 +1013,8 @@ mod tests {
 
     #[test]
     fn maps_azure_devops_remote_formats() {
-        let https = parse_azure_remote(
-            "https://dev.azure.com/InfiniteTek/MEP/_git/Collection",
-        )
-        .unwrap();
+        let https =
+            parse_azure_remote("https://dev.azure.com/InfiniteTek/MEP/_git/Collection").unwrap();
         assert_eq!(https.organization, "InfiniteTek");
         assert_eq!(https.project, "MEP");
         assert_eq!(https.repository, "Collection");
@@ -1049,22 +1024,17 @@ mod tests {
             Some(ForgeProviderKind::AzureDevOps)
         );
 
-        let credential = parse_azure_remote(
-            "https://user@dev.azure.com/InfiniteTek/MEP/_git/Collection",
-        )
-        .unwrap();
+        let credential =
+            parse_azure_remote("https://user@dev.azure.com/InfiniteTek/MEP/_git/Collection")
+                .unwrap();
         assert_eq!(credential.organization, "InfiniteTek");
 
-        let ssh = parse_azure_remote(
-            "git@ssh.dev.azure.com:v3/InfiniteTek/MEP/Collection",
-        )
-        .unwrap();
+        let ssh =
+            parse_azure_remote("git@ssh.dev.azure.com:v3/InfiniteTek/MEP/Collection").unwrap();
         assert!(ssh.ssh_remote);
 
-        let legacy = parse_azure_remote(
-            "https://InfiniteTek.visualstudio.com/MEP/_git/Collection",
-        )
-        .unwrap();
+        let legacy =
+            parse_azure_remote("https://InfiniteTek.visualstudio.com/MEP/_git/Collection").unwrap();
         assert_eq!(legacy.organization_url, "https://dev.azure.com/InfiniteTek");
     }
 
@@ -1072,7 +1042,10 @@ mod tests {
     fn rejects_unsupported_or_malformed_remotes() {
         assert_eq!(parse_github_remote("https://gitlab.com/a/b.git"), None);
         assert_eq!(parse_github_remote("https://github.com/only-owner"), None);
-        assert_eq!(parse_azure_remote("https://dev.azure.com/org/project/nope/repo"), None);
+        assert_eq!(
+            parse_azure_remote("https://dev.azure.com/org/project/nope/repo"),
+            None
+        );
         assert_eq!(detect_provider("https://gitlab.com/a/b.git"), None);
     }
 }
