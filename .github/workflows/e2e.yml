@@ -1,0 +1,157 @@
+name: e2e-gitgat
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "tests/e2e_git.rs"
+      - ".github/workflows/e2e.yml"
+      - "src/git.rs"
+      - "src/forge.rs"
+      - "src/process.rs"
+      - "src/store.rs"
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  local-git:
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal
+          rustup default 1.98.1
+      - name: Linux native dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxi-dev libxcursor-dev libxrandr-dev libxinerama-dev libgl1-mesa-dev
+      - name: Full local Git E2E
+        run: cargo test --test e2e_git -- --test-threads=1
+
+  live-github:
+    if: github.event_name != 'pull_request'
+    needs: local-git
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Verify GitHub and Git LFS clients
+        run: |
+          gh auth status
+          gh api "repos/$GITHUB_REPOSITORY" --jq '.full_name'
+          git lfs version
+
+      - name: Create isolated live branches
+        id: branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_BRANCH="e2e/${GITHUB_RUN_ID}/base"
+          HEAD_BRANCH="e2e/${GITHUB_RUN_ID}/head"
+          echo "base=$BASE_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "head=$HEAD_BRANCH" >> "$GITHUB_OUTPUT"
+
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git fetch origin main
+          git branch "$BASE_BRANCH" "$GITHUB_SHA"
+          git push origin "$BASE_BRANCH"
+          git switch -c "$HEAD_BRANCH" "$GITHUB_SHA"
+
+          mkdir -p e2e
+          git lfs install --local
+          git lfs track "e2e/live-lock.bin"
+          printf 'GitGat live GitHub E2E run %s\n' "$GITHUB_RUN_ID" > e2e/live.txt
+          printf 'lock validation %s\n' "$GITHUB_RUN_ID" > e2e/live-lock.bin
+          git add .gitattributes e2e/live.txt e2e/live-lock.bin
+          git commit -m "test(e2e): live GitHub validation $GITHUB_RUN_ID"
+          git push -u origin "$HEAD_BRANCH"
+
+      - name: Validate live Git LFS lock lifecycle
+        shell: bash
+        run: |
+          set -euo pipefail
+          git lfs lock e2e/live-lock.bin
+          git lfs locks --json | tee /tmp/locks.json
+          jq -e 'any(.locks[]?; .path == "e2e/live-lock.bin")' /tmp/locks.json
+          git lfs unlock e2e/live-lock.bin
+          git lfs locks --json | tee /tmp/locks-after.json
+          jq -e '([.locks[]? | select(.path == "e2e/live-lock.bin")] | length) == 0' /tmp/locks-after.json
+
+      - name: Create and exercise live pull request
+        id: pr
+        shell: bash
+        env:
+          BASE_BRANCH: ${{ steps.branches.outputs.base }}
+          HEAD_BRANCH: ${{ steps.branches.outputs.head }}
+        run: |
+          set -euo pipefail
+          PR_URL=$(gh pr create \
+            --base "$BASE_BRANCH" \
+            --head "$HEAD_BRANCH" \
+            --title "GitGat E2E live flow ${GITHUB_RUN_ID}" \
+            --body "Temporary PR created by the GitGat E2E workflow. It validates live GitHub list/edit/comment/review/merge plumbing without touching main or production.")
+          PR_NUMBER="${PR_URL##*/}"
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "url=$PR_URL" >> "$GITHUB_OUTPUT"
+
+          gh pr list --head "$HEAD_BRANCH" --json number,title,state,headRefName,baseRefName,url | tee /tmp/pr-list.json
+          jq -e --argjson n "$PR_NUMBER" 'any(.[]; .number == $n and .state == "OPEN")' /tmp/pr-list.json
+
+          gh pr edit "$PR_NUMBER" \
+            --title "GitGat E2E verified ${GITHUB_RUN_ID}" \
+            --body "Live GitHub E2E: PR list/edit/comment/review and merge target. Temporary branches are isolated from main and production."
+          gh pr comment "$PR_NUMBER" --body "GitGat E2E conversation comment: ${GITHUB_RUN_ID}"
+          gh pr review "$PR_NUMBER" --comment --body "GitGat E2E review comment: ${GITHUB_RUN_ID}"
+          gh pr view "$PR_NUMBER" --json number,title,state,headRefName,baseRefName,url | tee /tmp/pr-view.json
+          jq -e --argjson n "$PR_NUMBER" '.number == $n and .state == "OPEN"' /tmp/pr-view.json
+
+          gh run list --limit 20 --json databaseId,name,status,conclusion,headBranch,url | tee /tmp/runs.json
+          jq -e 'length > 0' /tmp/runs.json
+
+          {
+            echo "## Live GitHub E2E ready for external approval/merge"
+            echo "- PR: $PR_URL"
+            echo "- PR number: $PR_NUMBER"
+            echo "- Base: $BASE_BRANCH"
+            echo "- Head: $HEAD_BRANCH"
+            echo "- Git LFS lock/list/unlock: passed"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  cleanup-live-e2e:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && startsWith(github.event.pull_request.base.ref, 'e2e/')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+      HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+    steps:
+      - name: Remove temporary E2E branches
+        shell: bash
+        run: |
+          set -u
+          for branch in "$HEAD_BRANCH" "$BASE_BRANCH"; do
+            if gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/$branch"; then
+              echo "Deleted $branch"
+            else
+              echo "$branch was already deleted or could not be removed"
+            fi
+          done
