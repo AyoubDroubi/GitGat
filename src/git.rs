@@ -1,6 +1,6 @@
 use crate::domain::{
-    BranchInfo, ChangeKind, CommitInfo, FileChange, LfsLock, ReflogEntry, RepositorySnapshot,
-    RepositoryStatus, StashInfo, WorktreeInfo,
+    BranchInfo, ChangeKind, CommitInfo, FileChange, LfsLock, LfsLockOwnership, ReflogEntry,
+    RepositorySnapshot, RepositoryStatus, StashInfo, WorktreeInfo,
 };
 use crate::process::ProcessRunner;
 use crate::store::Catalog;
@@ -131,6 +131,7 @@ impl GitClient {
 
     pub fn stage(&self, repo: &Path, paths: &[String]) -> Result<()> {
         require_paths(paths)?;
+        self.require_owned_locks(repo, paths)?;
         let mut args = vec!["add".to_owned(), "--".to_owned()];
         args.extend(paths.iter().cloned());
         self.runner.run("git", args, Some(repo))?;
@@ -171,6 +172,8 @@ impl GitClient {
         if message.trim().is_empty() {
             bail!("commit message is required");
         }
+        let staged = self.staged_paths(repo)?;
+        self.require_owned_locks(repo, &staged)?;
         self.runner
             .run("git", ["commit", "-m", message.trim()], Some(repo))
     }
@@ -182,6 +185,9 @@ impl GitClient {
         self.runner.run("git", ["pull", "--ff-only"], Some(repo))
     }
     pub fn push(&self, repo: &Path) -> Result<String> {
+        if self.repository_has_lockable_patterns(repo)? {
+            self.lfs_enable_strict_locking(repo)?;
+        }
         self.runner.run("git", ["push"], Some(repo))
     }
 
@@ -464,43 +470,176 @@ impl GitClient {
     }
 
     pub fn lfs_locks(&self, repo: &Path) -> Result<Vec<LfsLock>> {
+        let (verified, output) = self.runner.run_allow_failure(
+            "git",
+            ["lfs", "locks", "--verify", "--json"],
+            Some(repo),
+        )?;
+        if verified {
+            return parse_lfs_locks_json(&output);
+        }
+
         let (ok, output) =
             self.runner
                 .run_allow_failure("git", ["lfs", "locks", "--json"], Some(repo))?;
         if !ok {
             return Ok(Vec::new());
         }
-        let value: Value = serde_json::from_str(&output)?;
-        let locks = value
-            .get("locks")
-            .and_then(Value::as_array)
-            .cloned()
-            .unwrap_or_default();
-        Ok(locks
-            .into_iter()
-            .map(|lock| LfsLock {
-                id: string_at(&lock, &["id"]),
-                path: string_at(&lock, &["path"]),
-                owner: string_at(&lock, &["owner", "name"]),
-                locked_at: string_at(&lock, &["locked_at"]),
-            })
-            .collect())
+        parse_lfs_locks_json(&output)
+    }
+
+    pub fn lfs_verified_locks(&self, repo: &Path) -> Result<Vec<LfsLock>> {
+        let output = self.runner.run(
+            "git",
+            ["lfs", "locks", "--verify", "--json"],
+            Some(repo),
+        )?;
+        parse_lfs_locks_json(&output)
+    }
+
+    pub fn lfs_track_lockable(&self, repo: &Path, pattern: &str) -> Result<String> {
+        let pattern = pattern.trim();
+        if pattern.is_empty() {
+            bail!("LFS lockable pattern is required");
+        }
+        self.runner
+            .run("git", ["lfs", "install", "--local"], Some(repo))?;
+        self.runner.run(
+            "git",
+            ["config", "lfs.setlockablereadonly", "true"],
+            Some(repo),
+        )?;
+        self.runner
+            .run("git", ["lfs", "track", "--lockable", pattern], Some(repo))
+    }
+
+    pub fn lfs_enable_strict_locking(&self, repo: &Path) -> Result<String> {
+        self.runner
+            .run("git", ["lfs", "install", "--local"], Some(repo))?;
+        self.runner.run(
+            "git",
+            ["config", "lfs.setlockablereadonly", "true"],
+            Some(repo),
+        )?;
+
+        // Probe the authoritative LFS lock verification endpoint first. Strict
+        // mode is fail-closed: a lockable repository must be able to verify
+        // ownership before GitGat allows a push.
+        self.lfs_verified_locks(repo)?;
+
+        let env = self.runner.run("git", ["lfs", "env"], Some(repo))?;
+        let endpoint = env
+            .lines()
+            .find_map(|line| line.strip_prefix("Endpoint="))
+            .and_then(|value| value.split(" (auth=").next())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| anyhow::anyhow!("Git LFS endpoint could not be discovered"))?;
+        let key = format!("lfs.{endpoint}.locksverify");
+        self.runner.run("git", ["config", &key, "true"], Some(repo))?;
+        Ok("Strict Git LFS locking enabled: lockable files are read-only unless owned, and push lock verification is required.".to_owned())
     }
 
     pub fn lfs_lock(&self, repo: &Path, path: &str) -> Result<String> {
-        if path.trim().is_empty() {
+        let path = path.trim();
+        if path.is_empty() {
             bail!("LFS path is required");
+        }
+        if !self.is_lfs_lockable(repo, path)? {
+            bail!("{path} is not marked lockable; protect it with a lockable LFS pattern first");
         }
         self.runner
             .run("git", ["lfs", "lock", "--", path], Some(repo))
     }
 
     pub fn lfs_unlock(&self, repo: &Path, path: &str) -> Result<String> {
-        if path.trim().is_empty() {
+        let path = path.trim();
+        if path.is_empty() {
             bail!("LFS path is required");
         }
         self.runner
             .run("git", ["lfs", "unlock", "--", path], Some(repo))
+    }
+
+    pub fn is_lfs_lockable(&self, repo: &Path, path: &str) -> Result<bool> {
+        let (ok, output) = self.runner.run_allow_failure(
+            "git",
+            ["check-attr", "lockable", "--", path],
+            Some(repo),
+        )?;
+        if !ok {
+            return Ok(false);
+        }
+        let value = output
+            .rsplit_once(':')
+            .map(|(_, value)| value.trim())
+            .unwrap_or_default();
+        Ok(matches!(value, "set" | "true" | "yes" | "on"))
+    }
+
+    fn staged_paths(&self, repo: &Path) -> Result<Vec<String>> {
+        let output = self.runner.run(
+            "git",
+            ["diff", "--cached", "--name-only", "-z"],
+            Some(repo),
+        )?;
+        Ok(output
+            .split('\0')
+            .filter(|path| !path.is_empty())
+            .map(str::to_owned)
+            .collect())
+    }
+
+    fn require_owned_locks(&self, repo: &Path, paths: &[String]) -> Result<()> {
+        let mut lockable = Vec::new();
+        for path in paths {
+            if self.is_lfs_lockable(repo, path)? {
+                lockable.push(path.replace('\\', "/"));
+            }
+        }
+        if lockable.is_empty() {
+            return Ok(());
+        }
+
+        let locks = self.lfs_verified_locks(repo)?;
+        for path in lockable {
+            let lock = locks
+                .iter()
+                .find(|lock| lock.path.replace('\\', "/") == path);
+            match lock.map(|lock| lock.ownership) {
+                Some(LfsLockOwnership::Ours) => {}
+                Some(LfsLockOwnership::Theirs) => {
+                    let owner = lock.map(|value| value.owner.as_str()).unwrap_or("another user");
+                    bail!("{path} is locked by {owner}; GitGat will not stage or commit it");
+                }
+                _ => bail!("{path} is lockable and must be locked by you before staging or committing"),
+            }
+        }
+        Ok(())
+    }
+
+    fn repository_has_lockable_patterns(&self, repo: &Path) -> Result<bool> {
+        let output = self.runner.run(
+            "git",
+            ["ls-files", "-z"],
+            Some(repo),
+        )?;
+        for path in output.split('\0').filter(|path| !path.is_empty()) {
+            if path == ".gitattributes" || path.ends_with("/.gitattributes") {
+                let full = repo.join(path);
+                let Ok(contents) = std::fs::read_to_string(full) else {
+                    continue;
+                };
+                if contents.lines().any(|line| {
+                    let line = line.trim();
+                    !line.starts_with('#')
+                        && line.split_whitespace().any(|token| token == "lockable")
+                }) {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
     }
 
     fn require_clean(&self, repo: &Path, operation: &str) -> Result<()> {
@@ -570,6 +709,41 @@ fn string_at(value: &Value, path: &[&str]) -> String {
         current = next;
     }
     current.as_str().unwrap_or_default().to_owned()
+}
+
+pub fn parse_lfs_locks_json(output: &str) -> Result<Vec<LfsLock>> {
+    let value: Value = serde_json::from_str(output)?;
+    let mut result = Vec::new();
+
+    let mut push_locks = |locks: &[Value], ownership: LfsLockOwnership| {
+        for lock in locks {
+            result.push(LfsLock {
+                id: string_at(lock, &["id"]),
+                path: string_at(lock, &["path"]),
+                owner: string_at(lock, &["owner", "name"]),
+                locked_at: string_at(lock, &["locked_at"]),
+                ownership,
+            });
+        }
+    };
+
+    if let Some(locks) = value.as_array() {
+        push_locks(locks, LfsLockOwnership::Unknown);
+        return Ok(result);
+    }
+
+    if let Some(ours) = value.get("ours").and_then(Value::as_array) {
+        push_locks(ours, LfsLockOwnership::Ours);
+    }
+    if let Some(theirs) = value.get("theirs").and_then(Value::as_array) {
+        push_locks(theirs, LfsLockOwnership::Theirs);
+    }
+    if result.is_empty()
+        && let Some(locks) = value.get("locks").and_then(Value::as_array)
+    {
+        push_locks(locks, LfsLockOwnership::Unknown);
+    }
+    Ok(result)
 }
 
 pub fn contains_conflict_markers(text: &str) -> bool {
@@ -683,8 +857,8 @@ pub fn parse_worktrees(output: &str) -> Vec<WorktreeInfo> {
 
 #[cfg(test)]
 mod tests {
-    use super::{GitClient, contains_conflict_markers, parse_porcelain_v2};
-    use crate::domain::ChangeKind;
+    use super::{GitClient, contains_conflict_markers, parse_lfs_locks_json, parse_porcelain_v2};
+    use crate::domain::{ChangeKind, LfsLockOwnership};
     use crate::store::Catalog;
     use std::process::Command;
     use tempfile::tempdir;
@@ -713,6 +887,24 @@ mod tests {
         assert_eq!(values[0].path, "src/main.rs");
         assert_eq!(values[1].kind, ChangeKind::Untracked);
         assert!(values[2].conflicted);
+    }
+
+    #[test]
+    fn parses_verified_and_plain_lfs_lock_json() {
+        let verified = parse_lfs_locks_json(
+            r#"{"ours":[{"id":"1","path":"Assets/a.psd","owner":{"name":"Ayoub"},"locked_at":"2026-09-29T00:00:00Z"}],"theirs":[{"id":"2","path":"Assets/b.psd","owner":{"name":"Saad"},"locked_at":"2026-09-29T00:01:00Z"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(verified.len(), 2);
+        assert_eq!(verified[0].ownership, LfsLockOwnership::Ours);
+        assert_eq!(verified[1].ownership, LfsLockOwnership::Theirs);
+
+        let plain = parse_lfs_locks_json(
+            r#"[{"id":"3","path":"Assets/c.psd","owner":{"name":"User"},"locked_at":"2026-09-29T00:02:00Z"}]"#,
+        )
+        .unwrap();
+        assert_eq!(plain.len(), 1);
+        assert_eq!(plain[0].ownership, LfsLockOwnership::Unknown);
     }
 
     #[test]
