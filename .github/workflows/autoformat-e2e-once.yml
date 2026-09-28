@@ -1,0 +1,35 @@
+name: autoformat-e2e-once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/autoformat-e2e-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install rustfmt
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal --component rustfmt
+          rustup default 1.98.1
+      - name: Format Rust
+        run: cargo fmt --all
+      - name: Commit formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "Nothing to format."
+            exit 0
+          fi
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add tests/e2e_git.rs
+          git commit -m "style(e2e): apply rustfmt"
+          git push
