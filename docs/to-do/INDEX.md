@@ -27,7 +27,38 @@ Production: reserved and untouched
 | RUST-016 | Forge provider abstraction (GitHub/Azure DevOps) | IN PROGRESS | implementation present; quality/regression gate pending |
 | RUST-017 | Azure DevOps Repos/PRs/Pipelines integration | IN PROGRESS | implementation present; authenticated Azure live E2E pending |
 | RUST-018 | Provider-side required lock-policy check before merge | TODO | GitHub required check + Azure branch policy |
-| RUST-019 | GitGat Control Plane / admin portal for governance and audit | TODO | policy/audit service + admin UI |
+| RUST-019 | GitGat Control Plane / admin portal foundation | TODO | API + PostgreSQL + admin UI foundation |
+| RUST-020 | Identity, organizations, teams and RBAC | TODO | tenant isolation + permission tests |
+| RUST-021 | Repository enrollment, provider connections and webhooks | TODO | live enrollment + signed webhook E2E |
+| RUST-022 | Lock policy and protected-pattern management | TODO | policy CRUD + drift/reconciliation PR |
+| RUST-023 | Organization-wide active lock dashboard | TODO | provider-verified lock reconciliation |
+| RUST-024 | Force-unlock approvals and policy exceptions | TODO | approval/exception E2E + durable audit |
+| RUST-025 | Durable audit ledger and compliance history | TODO | immutable/searchable/exportable audit evidence |
+| RUST-026 | Stale-lock detection, reminders and escalation | TODO | reconciliation + reminder/escalation E2E |
+| RUST-027 | Desktop enrollment, policy sync and offline behavior | TODO | managed-repo desktop E2E |
+| RUST-028 | Provider branch protection / status enforcement | TODO | GitHub + Azure required status live evidence |
+| RUST-029 | Admin operations, observability and support tooling | TODO | health/metrics/retry/diagnostic evidence |
+| RUST-030 | Security hardening and threat-model closure | TODO | security tests + dependency audit + review |
+| RUST-031 | Database lifecycle, backups, migrations and retention | TODO | migration + restore drill |
+| RUST-032 | Control Plane deployment and production infrastructure | TODO | staging deploy + rollback evidence |
+| RUST-033 | Full-system E2E and failure validation | TODO | GitHub/Azure + 3 OS golden journey matrix |
+| RUST-034 | Documentation, onboarding and operational runbooks | TODO | user/admin/operator walkthroughs |
+| RUST-035 | Production release certification and rollout | TODO | final signed release evidence |
+
+## Delivery phases
+
+| Phase | TODOs | Outcome |
+|---|---|---|
+| A - Locking Core | RUST-014..015 | strict desktop locking proven between real identities |
+| B - Multi-provider Forge | RUST-016..017 | GitHub + Azure DevOps parity for product scope |
+| C - Server Enforcement | RUST-018 | lock policy cannot be bypassed by another Git client |
+| D - Control Plane Foundation | RUST-019..021 | admin service, identity and repository enrollment |
+| E - Governance | RUST-022..026 | policies, locks, approvals, audit and stale-lock operations |
+| F - Desktop Integration | RUST-027..028 | managed repositories and provider-side enforcement |
+| G - Operations/Security | RUST-029..032 | observable, secure, recoverable deployable platform |
+| H - Certification | RUST-033..035 | end-to-end validation, runbooks and production release |
+
+Detailed execution plans live in `docs/to-do/RUST-014-*.md` through `RUST-035-*.md`. The master dependency/order view is `docs/to-do/ROADMAP.md`.
 
 ## Current locking expansion
 
