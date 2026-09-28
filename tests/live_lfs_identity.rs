@@ -46,8 +46,7 @@ fn live_fixture() -> (tempfile::TempDir, GitClient, PathBuf, String) {
         std::env::var("GITGAT_LIVE_REPO")
             .expect("GITGAT_LIVE_REPO must point to the teammate clone"),
     );
-    let path =
-        std::env::var("GITGAT_LIVE_LOCK_PATH").expect("GITGAT_LIVE_LOCK_PATH must be set");
+    let path = std::env::var("GITGAT_LIVE_LOCK_PATH").expect("GITGAT_LIVE_LOCK_PATH must be set");
     assert!(repo.join(&path).exists(), "protected file should exist");
     let root = tempfile::tempdir().unwrap();
     let catalog = Catalog::open(root.path().join("catalog.db")).unwrap();
