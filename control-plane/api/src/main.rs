@@ -48,7 +48,8 @@ async fn shutdown_signal() {
     #[cfg(unix)]
     let terminate = async {
         use tokio::signal::unix::{SignalKind, signal};
-        let mut stream = signal(SignalKind::terminate()).expect("failed to install SIGTERM handler");
+        let mut stream =
+            signal(SignalKind::terminate()).expect("failed to install SIGTERM handler");
         stream.recv().await;
     };
 
