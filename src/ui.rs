@@ -1,4 +1,4 @@
-use crate::domain::{ForgeSnapshot, RepositorySnapshot};
+use crate::domain::{ForgeSnapshot, LfsLockOwnership, RepositorySnapshot};
 use crate::forge::GitHubClient;
 use crate::git::{ConflictChoice, GitClient, ResetMode};
 use crate::store::Catalog;
@@ -74,6 +74,7 @@ pub struct GitGatApp {
     worktree_path: String,
     worktree_branch: String,
     lfs_path: String,
+    lfs_pattern: String,
     pr_number: String,
     pr_title: String,
     pr_body: String,
@@ -111,6 +112,7 @@ impl GitGatApp {
             worktree_path: String::new(),
             worktree_branch: String::new(),
             lfs_path: String::new(),
+            lfs_pattern: String::from("*.psd"),
             pr_number: String::new(),
             pr_title: String::new(),
             pr_body: String::new(),
@@ -616,6 +618,33 @@ impl GitGatApp {
             ui.label("Open a repository first.");
             return;
         };
+
+        ui.label("Protected file patterns");
+        ui.horizontal(|ui| {
+            ui.add(
+                TextEdit::singleline(&mut self.lfs_pattern)
+                    .desired_width(220.0)
+                    .hint_text("*.uasset / *.psd / Assets/**"),
+            );
+            if ui.button("Protect as lockable").clicked() {
+                let pattern = self.lfs_pattern.clone();
+                let r = self.git.lfs_track_lockable(&repo, &pattern);
+                self.finish_git(r);
+            }
+            if ui.button("Enable strict locking").clicked() {
+                let r = self.git.lfs_enable_strict_locking(&repo);
+                self.finish_git(r);
+            }
+        });
+        ui.weak(
+            "Protect as lockable updates .gitattributes. Commit that file so every clone gets the same read-only/locking policy.",
+        );
+        ui.weak(
+            "Strict locking enables read-only lockable files and fail-closed LFS lock verification before pushes.",
+        );
+
+        ui.separator();
+        ui.label("File lock");
         ui.horizontal(|ui| {
             ui.add(TextEdit::singleline(&mut self.lfs_path).hint_text("Assets/file.psd"));
             if ui.button("Lock").clicked() {
@@ -628,14 +657,26 @@ impl GitGatApp {
                 let r = self.git.lfs_unlock(&repo, &p);
                 self.finish_git(r);
             }
+            if ui.button("Refresh locks").clicked() {
+                self.refresh_git();
+            }
         });
+
+        ui.separator();
         for lock in self.snapshot.lfs_locks.clone() {
             ui.horizontal(|ui| {
+                let ownership = match lock.ownership {
+                    LfsLockOwnership::Ours => "Locked by you",
+                    LfsLockOwnership::Theirs => "Locked by teammate",
+                    LfsLockOwnership::Unknown => "Locked",
+                };
                 ui.monospace(lock.path);
+                ui.label(ownership);
                 ui.weak(format!("{} · {}", lock.owner, lock.locked_at));
             });
         }
         ui.weak("Force unlock is intentionally not exposed by default.");
+        ui.weak("GitGat blocks staging/committing a lockable file unless the verified remote lock belongs to you.");
     }
 
     fn actions(&mut self, ui: &mut egui::Ui) {
