@@ -31,7 +31,10 @@ fn init_repo(path: &Path) {
 }
 
 fn configure_identity(repo: &Path) {
-    git(repo, &["config", "user.email", "gitgat-e2e@example.invalid"]);
+    git(
+        repo,
+        &["config", "user.email", "gitgat-e2e@example.invalid"],
+    );
     git(repo, &["config", "user.name", "GitGat E2E"]);
 }
 
@@ -56,10 +59,7 @@ fn create_remote_fixture(root: &TempDir) -> (GitClient, Catalog, std::path::Path
     write(&seed.join("conflict.txt"), "base\n");
     write(&seed.join("abort.txt"), "base\n");
     commit_all(&seed, "initial");
-    git(
-        &seed,
-        &["remote", "add", "origin", bare.to_str().unwrap()],
-    );
+    git(&seed, &["remote", "add", "origin", bare.to_str().unwrap()]);
     git(&seed, &["push", "-u", "origin", "main"]);
 
     let catalog = Catalog::open(root.path().join("catalog.db")).unwrap();
@@ -90,7 +90,11 @@ fn end_to_end_local_git_and_catalog_flow() {
     let workspace_id = catalog.create_workspace("E2E Workspace").unwrap();
     catalog.add_to_workspace(workspace_id, &repo).unwrap();
     let repositories = catalog.repositories().unwrap();
-    assert!(repositories.iter().any(|item| item.path == cloned && item.favorite));
+    assert!(
+        repositories
+            .iter()
+            .any(|item| item.path == cloned && item.favorite)
+    );
     let workspaces = catalog.workspaces().unwrap();
     assert!(
         workspaces
@@ -104,7 +108,12 @@ fn end_to_end_local_git_and_catalog_flow() {
     write(&repo.join("new file.txt"), "untracked\n");
     let changes = client.changes(&repo).unwrap();
     assert_eq!(changes.len(), 2);
-    assert!(client.diff(&repo, "tracked.txt", false).unwrap().contains("edited"));
+    assert!(
+        client
+            .diff(&repo, "tracked.txt", false)
+            .unwrap()
+            .contains("edited")
+    );
 
     client.stage(&repo, &["tracked.txt".to_owned()]).unwrap();
     assert!(
@@ -122,7 +131,10 @@ fn end_to_end_local_git_and_catalog_flow() {
             .contains("never deletes untracked")
     );
     client.discard(&repo, &["tracked.txt".to_owned()]).unwrap();
-    assert_eq!(std::fs::read_to_string(repo.join("tracked.txt")).unwrap(), "seed\n");
+    assert_eq!(
+        std::fs::read_to_string(repo.join("tracked.txt")).unwrap(),
+        "seed\n"
+    );
     std::fs::remove_file(repo.join("new file.txt")).unwrap();
 
     // Commit and normal push.
@@ -145,7 +157,10 @@ fn end_to_end_local_git_and_catalog_flow() {
     client.fetch(&repo).unwrap();
     assert!(client.status(&repo).unwrap().behind >= 1);
     client.pull_ff_only(&repo).unwrap();
-    assert_eq!(std::fs::read_to_string(repo.join("peer.txt")).unwrap(), "from peer\n");
+    assert_eq!(
+        std::fs::read_to_string(repo.join("peer.txt")).unwrap(),
+        "from peer\n"
+    );
 
     // Branch creation, dirty-worktree guard, switch and safe delete.
     client.create_branch(&repo, "feature/e2e").unwrap();
@@ -159,12 +174,23 @@ fn end_to_end_local_git_and_catalog_flow() {
     client.stage(&repo, &["feature.txt".to_owned()]).unwrap();
     client.commit(&repo, "feature commit").unwrap();
     client.checkout_branch(&repo, "main").unwrap();
-    git(&repo, &["merge", "--no-ff", "feature/e2e", "-m", "merge feature"]);
+    git(
+        &repo,
+        &["merge", "--no-ff", "feature/e2e", "-m", "merge feature"],
+    );
     client.delete_branch(&repo, "feature/e2e").unwrap();
 
     let branches = client.branches(&repo).unwrap();
-    assert!(branches.iter().any(|branch| branch.name == "main" && !branch.remote));
-    assert!(branches.iter().any(|branch| branch.remote && branch.name.ends_with("origin/main")));
+    assert!(
+        branches
+            .iter()
+            .any(|branch| branch.name == "main" && !branch.remote)
+    );
+    assert!(
+        branches
+            .iter()
+            .any(|branch| branch.remote && branch.name.ends_with("origin/main"))
+    );
     assert!(!client.history(&repo, 20).unwrap().is_empty());
 
     // Stash push/apply/pop/drop, including untracked content.
@@ -173,10 +199,16 @@ fn end_to_end_local_git_and_catalog_flow() {
     client.stash_push(&repo, "e2e stash", true).unwrap();
     let stash = client.stashes(&repo).unwrap().into_iter().next().unwrap();
     client.stash_apply(&repo, &stash.reference).unwrap();
-    assert_eq!(std::fs::read_to_string(repo.join("tracked.txt")).unwrap(), "stashed\n");
+    assert_eq!(
+        std::fs::read_to_string(repo.join("tracked.txt")).unwrap(),
+        "stashed\n"
+    );
     clean_test_changes(&repo);
     client.stash_pop(&repo, &stash.reference).unwrap();
-    assert_eq!(std::fs::read_to_string(repo.join("tracked.txt")).unwrap(), "stashed\n");
+    assert_eq!(
+        std::fs::read_to_string(repo.join("tracked.txt")).unwrap(),
+        "stashed\n"
+    );
     clean_test_changes(&repo);
 
     write(&repo.join("tracked.txt"), "drop me\n");
@@ -199,7 +231,11 @@ fn end_to_end_local_git_and_catalog_flow() {
     let merge = command(&repo, &["merge", "conflict-side"]);
     assert!(!merge.status.success());
     assert_eq!(client.conflicts(&repo).unwrap(), vec!["conflict.txt"]);
-    assert!(client.mark_conflict_resolved(&repo, "conflict.txt").is_err());
+    assert!(
+        client
+            .mark_conflict_resolved(&repo, "conflict.txt")
+            .is_err()
+    );
     client
         .resolve_conflict(&repo, "conflict.txt", ConflictChoice::Ours)
         .unwrap();
@@ -250,7 +286,9 @@ fn end_to_end_local_git_and_catalog_flow() {
     client.create_branch(&repo, "rebase-e2e").unwrap();
     client.checkout_branch(&repo, "rebase-e2e").unwrap();
     write(&repo.join("rebase-feature.txt"), "feature\n");
-    client.stage(&repo, &["rebase-feature.txt".to_owned()]).unwrap();
+    client
+        .stage(&repo, &["rebase-feature.txt".to_owned()])
+        .unwrap();
     client.commit(&repo, "rebase feature").unwrap();
     client.checkout_branch(&repo, "main").unwrap();
     write(&repo.join("main-only.txt"), "main moved\n");
@@ -271,25 +309,34 @@ fn end_to_end_local_git_and_catalog_flow() {
     let cherry_sha = git(&repo, &["rev-parse", "HEAD"]);
     client.checkout_branch(&repo, "main").unwrap();
     client.cherry_pick(&repo, &cherry_sha).unwrap();
-    assert_eq!(std::fs::read_to_string(repo.join("cherry.txt")).unwrap(), "pick me\n");
+    assert_eq!(
+        std::fs::read_to_string(repo.join("cherry.txt")).unwrap(),
+        "pick me\n"
+    );
 
     // Soft and mixed reset keep worktree content while changing index state.
     let before_reset = git(&repo, &["rev-parse", "HEAD"]);
     write(&repo.join("tracked.txt"), "reset content\n");
     client.stage(&repo, &["tracked.txt".to_owned()]).unwrap();
     client.commit(&repo, "reset candidate").unwrap();
-    client
-        .reset(&repo, &before_reset, ResetMode::Soft)
-        .unwrap();
-    assert!(client.changes(&repo).unwrap().iter().any(|change| {
-        change.path == "tracked.txt" && change.staged
-    }));
+    client.reset(&repo, &before_reset, ResetMode::Soft).unwrap();
+    assert!(
+        client
+            .changes(&repo)
+            .unwrap()
+            .iter()
+            .any(|change| { change.path == "tracked.txt" && change.staged })
+    );
     client
         .reset(&repo, &before_reset, ResetMode::Mixed)
         .unwrap();
-    assert!(client.changes(&repo).unwrap().iter().any(|change| {
-        change.path == "tracked.txt" && !change.staged
-    }));
+    assert!(
+        client
+            .changes(&repo)
+            .unwrap()
+            .iter()
+            .any(|change| { change.path == "tracked.txt" && !change.staged })
+    );
     client.discard(&repo, &["tracked.txt".to_owned()]).unwrap();
 
     // Hard reset moves a clean tree backwards; recovery branch restores the discarded commit.
@@ -303,10 +350,7 @@ fn end_to_end_local_git_and_catalog_flow() {
     client
         .create_recovery_branch(&repo, "recovery/e2e", &discarded_sha)
         .unwrap();
-    assert_eq!(
-        git(&repo, &["rev-parse", "recovery/e2e"]),
-        discarded_sha
-    );
+    assert_eq!(git(&repo, &["rev-parse", "recovery/e2e"]), discarded_sha);
 
     // Worktree lifecycle.
     client.create_branch(&repo, "worktree-e2e").unwrap();
@@ -331,7 +375,14 @@ fn end_to_end_local_git_and_catalog_flow() {
     assert_eq!(snapshot.status.branch, "main");
     assert!(!snapshot.commits.is_empty());
     let journal = catalog.recent_journal(&repo, 100).unwrap();
-    for expected in ["stash-pop", "stash-drop", "rebase", "cherry-pick", "reset", "recovery-branch"] {
+    for expected in [
+        "stash-pop",
+        "stash-drop",
+        "rebase",
+        "cherry-pick",
+        "reset",
+        "recovery-branch",
+    ] {
         assert!(
             journal.iter().any(|line| line.contains(expected)),
             "journal should contain {expected}: {journal:?}"
@@ -374,8 +425,12 @@ fn ff_only_pull_rejects_divergent_history() {
 
     let left = root.path().join("left");
     let right = root.path().join("right");
-    client.clone_repository(bare.to_str().unwrap(), &left).unwrap();
-    client.clone_repository(bare.to_str().unwrap(), &right).unwrap();
+    client
+        .clone_repository(bare.to_str().unwrap(), &left)
+        .unwrap();
+    client
+        .clone_repository(bare.to_str().unwrap(), &right)
+        .unwrap();
     configure_identity(&left);
     configure_identity(&right);
 
@@ -392,10 +447,11 @@ fn ff_only_pull_rejects_divergent_history() {
     let error = client.pull_ff_only(&left).unwrap_err();
     let text = error.to_string().to_lowercase();
     assert!(
-        text.contains("fast-forward")
-            || text.contains("diverg")
-            || text.contains("not possible"),
+        text.contains("fast-forward") || text.contains("diverg") || text.contains("not possible"),
         "unexpected pull failure: {text}"
     );
-    assert_eq!(std::fs::read_to_string(left.join("left.txt")).unwrap(), "left\n");
+    assert_eq!(
+        std::fs::read_to_string(left.join("left.txt")).unwrap(),
+        "left\n"
+    );
 }
