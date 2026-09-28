@@ -1,0 +1,46 @@
+name: autoformat-rust
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "Cargo.toml"
+      - "rust-toolchain.toml"
+      - ".github/workflows/autoformat-rust.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: autoformat-rust-main
+  cancel-in-progress: true
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install Rustfmt
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal --component rustfmt
+          rustup default 1.98.1
+
+      - name: Apply rustfmt
+        run: cargo fmt --all
+
+      - name: Commit formatting
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- '*.rs'
+          git commit -m "style(rust): apply rustfmt"
+          git push origin HEAD:main
