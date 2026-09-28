@@ -66,7 +66,9 @@ The evaluator:
 3. queries the authoritative Git LFS lock service;
 4. requires each protected changed file to have an active lock;
 5. requires the lock owner to match the PR actor;
-6. fails closed if the lock service cannot be queried.
+6. evaluates lockability from both base and head so removing `lockable` in the PR cannot bypass policy;
+7. blocks direct `.gitattributes` changes pending the dedicated administrator policy workflow;
+8. fails closed if the lock service cannot be queried.
 
 ## Remaining before DONE
 - current branch quality + lock-policy workflow must be green;
