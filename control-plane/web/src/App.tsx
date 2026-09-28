@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { controlPlaneApi } from './api'
-import type { DashboardSummary, ServiceMeta } from './types'
+import type {
+  CurrentIdentity,
+  DashboardSummary,
+  OrganizationSummary,
+  ServiceMeta,
+} from './types'
 
 type LoadState = 'loading' | 'ready' | 'error'
 
@@ -18,24 +23,60 @@ const emptySummary: DashboardSummary = {
 function App() {
   const [summary, setSummary] = useState<DashboardSummary>(emptySummary)
   const [meta, setMeta] = useState<ServiceMeta | null>(null)
+  const [identity, setIdentity] = useState<CurrentIdentity | null>(null)
+  const [organizations, setOrganizations] = useState<OrganizationSummary[]>([])
+  const [organizationId, setOrganizationId] = useState('')
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [message, setMessage] = useState('Connecting to the Control Plane…')
 
+  async function loadOrganization(id: string) {
+    if (!id) {
+      setSummary(emptySummary)
+      return
+    }
+    const nextSummary = await controlPlaneApi.summary(id)
+    setSummary(nextSummary)
+  }
+
   async function refresh() {
     setLoadState('loading')
-    setMessage('Refreshing provider and governance state…')
+    setMessage('Refreshing identity, provider and governance state…')
     try {
-      const [nextMeta, health, nextSummary] = await Promise.all([
+      const [nextMeta, health, nextIdentity, nextOrganizations] = await Promise.all([
         controlPlaneApi.meta(),
         controlPlaneApi.health(),
-        controlPlaneApi.summary(),
+        controlPlaneApi.me(),
+        controlPlaneApi.organizations(),
       ])
       setMeta(nextMeta)
-      setSummary(nextSummary)
-      setMessage(`API ${health.status} · provider lock authority: ${nextMeta.active_lock_authority}`)
+      setIdentity(nextIdentity)
+      setOrganizations(nextOrganizations)
+
+      const selected =
+        nextOrganizations.find((organization) => organization.id === organizationId)?.id ??
+        nextOrganizations[0]?.id ??
+        ''
+      setOrganizationId(selected)
+      await loadOrganization(selected)
+
+      setMessage(
+        `API ${health.status} · signed in as ${nextIdentity.display_name ?? nextIdentity.email ?? nextIdentity.subject}`,
+      )
       setLoadState('ready')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Control Plane is unavailable')
+      setLoadState('error')
+    }
+  }
+
+  async function changeOrganization(id: string) {
+    setOrganizationId(id)
+    setLoadState('loading')
+    try {
+      await loadOrganization(id)
+      setLoadState('ready')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Organization data is unavailable')
       setLoadState('error')
     }
   }
@@ -52,7 +93,7 @@ function App() {
       ['Stale locks', summary.stale_lock_observations, 'Needs owner/admin attention'],
       ['Force-unlock requests', summary.pending_force_unlock_requests, 'Pending approval'],
       ['Policy exceptions', summary.active_policy_exceptions, 'Active and time-bound'],
-      ['Organizations', summary.organizations, 'Tenant boundary'],
+      ['Organizations', summary.organizations, 'Current tenant boundary'],
       ['Audit events', summary.audit_events, 'Durable governance history'],
     ] as const,
     [summary],
@@ -92,14 +133,30 @@ function App() {
             <p className="eyebrow">Organization governance</p>
             <h1>Overview</h1>
           </div>
-          <button className="refresh" onClick={() => void refresh()} disabled={loadState === 'loading'}>
-            {loadState === 'loading' ? 'Refreshing…' : 'Refresh'}
-          </button>
+          <div className="topbar-actions">
+            <select
+              aria-label="Organization"
+              value={organizationId}
+              disabled={organizations.length === 0 || loadState === 'loading'}
+              onChange={(event) => void changeOrganization(event.target.value)}
+            >
+              {organizations.length === 0 && <option value="">No organizations</option>}
+              {organizations.map((organization) => (
+                <option key={organization.id} value={organization.id}>
+                  {organization.name} · {organization.role}
+                </option>
+              ))}
+            </select>
+            <button className="refresh" onClick={() => void refresh()} disabled={loadState === 'loading'}>
+              {loadState === 'loading' ? 'Refreshing…' : 'Refresh'}
+            </button>
+          </div>
         </header>
 
         <section className={`status-banner ${loadState}`}>
           <span className="status-dot" />
           <span>{message}</span>
+          {identity && <code>{identity.email ?? identity.subject}</code>}
           {meta && <code>v{meta.version}</code>}
         </section>
 
@@ -120,14 +177,15 @@ function App() {
                 <p className="eyebrow">Enforcement</p>
                 <h2>Safety gates</h2>
               </div>
-              <span className="badge">Foundation</span>
+              <span className="badge">RBAC foundation</span>
             </div>
             <div className="gate-list">
+              <Gate name="OIDC/JWKS API authentication" state="In progress" />
+              <Gate name="Organization-scoped RBAC" state="In progress" />
               <Gate name="Desktop Stage / Commit lock ownership" state="Implemented" />
               <Gate name="Git LFS strict Push verification" state="Implemented" />
-              <Gate name="GitHub PR lock-policy check" state="In progress" />
-              <Gate name="Azure DevOps PR policy" state="In progress" />
-              <Gate name="RBAC + force-unlock approval" state="Blocked by design" />
+              <Gate name="Provider PR lock-policy check" state="In progress" />
+              <Gate name="Force-unlock execution" state="Blocked by design" />
             </div>
           </article>
 
