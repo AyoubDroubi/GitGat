@@ -16,6 +16,7 @@ on:
       - "Cargo.lock"
       - "rust-toolchain.toml"
       - "src/**"
+      - "tests/**"
       - "packaging/windows/**"
       - "scripts/package-windows.ps1"
       - ".github/workflows/package-windows.yml"
