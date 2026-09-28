@@ -1,5 +1,5 @@
 use crate::domain::{ForgeSnapshot, LfsLockOwnership, RepositorySnapshot};
-use crate::forge::GitHubClient;
+use crate::forge::ForgeClient;
 use crate::git::{ConflictChoice, GitClient, ResetMode};
 use crate::store::Catalog;
 use anyhow::Result;
@@ -56,7 +56,7 @@ impl Tab {
 pub struct GitGatApp {
     catalog: Catalog,
     git: GitClient,
-    forge: GitHubClient,
+    forge: ForgeClient,
     tab: Tab,
     repository: Option<PathBuf>,
     snapshot: RepositorySnapshot,
@@ -76,6 +76,7 @@ pub struct GitGatApp {
     lfs_path: String,
     lfs_pattern: String,
     pr_number: String,
+    pr_base: String,
     pr_title: String,
     pr_body: String,
     pr_comment: String,
@@ -94,7 +95,7 @@ impl GitGatApp {
         Self {
             git: GitClient::new(catalog.clone()),
             catalog,
-            forge: GitHubClient::default(),
+            forge: ForgeClient::default(),
             tab: Tab::Overview,
             repository: None,
             snapshot: RepositorySnapshot::default(),
@@ -114,6 +115,7 @@ impl GitGatApp {
             lfs_path: String::new(),
             lfs_pattern: String::from("*.psd"),
             pr_number: String::new(),
+            pr_base: String::from("main"),
             pr_title: String::new(),
             pr_body: String::new(),
             pr_comment: String::new(),
@@ -538,24 +540,56 @@ impl GitGatApp {
             ui.label("Open a repository first.");
             return;
         };
+        let provider = self
+            .forge
+            .provider_label(&repo)
+            .unwrap_or("Unsupported provider");
         ui.horizontal(|ui| {
-            if ui.button("Refresh GitHub").clicked() {
+            if ui.button("Refresh provider").clicked() {
                 self.refresh_forge();
             }
             ui.label(if self.forge_snapshot.authenticated {
                 format!(
-                    "Connected as {}",
+                    "{provider} · connected as {}",
                     self.forge_snapshot.account.clone().unwrap_or_default()
                 )
             } else {
-                "GitHub not connected".to_owned()
+                format!("{provider} · not connected")
             });
         });
+
+        ui.separator();
+        ui.label("Create pull request from the current branch");
+        ui.horizontal(|ui| {
+            ui.add(
+                TextEdit::singleline(&mut self.pr_base)
+                    .desired_width(160.0)
+                    .hint_text("Base branch"),
+            );
+            ui.add(TextEdit::singleline(&mut self.pr_title).hint_text("Title"));
+            if ui.button("Create PR").clicked() {
+                let title = self.pr_title.clone();
+                let body = self.pr_body.clone();
+                let base = self.pr_base.clone();
+                let r = self
+                    .forge
+                    .create_pull_request(&repo, &title, &body, &base);
+                self.finish_forge(r);
+            }
+        });
+        ui.add(
+            TextEdit::multiline(&mut self.pr_body)
+                .desired_rows(4)
+                .hint_text("Pull request body"),
+        );
+
+        ui.separator();
         for pr in self.forge_snapshot.pull_requests.clone() {
             ui.horizontal_wrapped(|ui| {
                 if ui.button(format!("#{}", pr.number)).clicked() {
                     self.pr_number = pr.number.to_string();
                     self.pr_title = pr.title.clone();
+                    self.pr_base = pr.base.clone();
                 }
                 ui.label(&pr.title);
                 ui.weak(format!("{} → {} by {}", pr.head, pr.base, pr.author));
@@ -564,7 +598,9 @@ impl GitGatApp {
                 }
             });
         }
+
         ui.separator();
+        ui.label("Manage selected pull request");
         ui.horizontal(|ui| {
             ui.label("PR #");
             ui.add(TextEdit::singleline(&mut self.pr_number).desired_width(80.0));
@@ -591,7 +627,7 @@ impl GitGatApp {
                 let r = self.forge.review_pull_request(&repo, n, true, &b);
                 self.finish_forge(r);
             }
-            if ui.button("Merge").clicked()
+            if ui.button("Merge / Complete").clicked()
                 && let Ok(n) = self.parse_pr()
             {
                 let r = self.forge.merge_pull_request(&repo, n);
@@ -680,13 +716,13 @@ impl GitGatApp {
     }
 
     fn actions(&mut self, ui: &mut egui::Ui) {
-        ui.heading("GitHub Actions");
+        ui.heading("CI / Pipeline Runs");
         let Some(repo) = self.current_repo() else {
             ui.label("Open a repository first.");
             return;
         };
         ui.horizontal(|ui| {
-            if ui.button("Refresh GitHub").clicked() {
+            if ui.button("Refresh provider").clicked() {
                 self.refresh_forge();
             }
             ui.add(
@@ -1029,26 +1065,37 @@ impl GitGatApp {
 
     fn settings(&mut self, ui: &mut egui::Ui) {
         ui.heading("Settings");
-        ui.label("GitHub credentials are owned by GitHub CLI / the OS credential store. GitGat does not store GitHub tokens.");
-        ui.horizontal(|ui| {
-            if ui.button("Check GitHub").clicked() {
-                self.refresh_forge();
-            }
-            if ui.button("Connect GitHub").clicked() {
-                let r = self.forge.login();
-                self.finish_forge(r);
-            }
-            if ui.button("Disconnect GitHub").clicked() {
-                match self.forge.logout() {
-                    Ok(text) => {
-                        self.output_text = text;
-                        self.forge_snapshot = ForgeSnapshot::default();
-                        self.notice = "GitHub disconnected.".to_owned();
-                    }
-                    Err(error) => self.notice = error.to_string(),
+        ui.label(
+            "Provider credentials belong to GitHub CLI or Azure CLI / the OS credential store. GitGat does not persist GitHub tokens or Azure DevOps PATs.",
+        );
+        if let Some(repo) = self.current_repo() {
+            let provider = self
+                .forge
+                .provider_label(&repo)
+                .unwrap_or("Unsupported provider");
+            ui.label(format!("Detected provider: {provider}"));
+            ui.horizontal(|ui| {
+                if ui.button("Check provider").clicked() {
+                    self.refresh_forge();
                 }
-            }
-        });
+                if ui.button("Connect provider").clicked() {
+                    let r = self.forge.login(&repo);
+                    self.finish_forge(r);
+                }
+                if ui.button("Disconnect provider").clicked() {
+                    match self.forge.logout(&repo) {
+                        Ok(text) => {
+                            self.output_text = text;
+                            self.forge_snapshot = ForgeSnapshot::default();
+                            self.notice = format!("{provider} disconnected.");
+                        }
+                        Err(error) => self.notice = error.to_string(),
+                    }
+                }
+            });
+        } else {
+            ui.weak("Open a repository to detect and configure its forge provider.");
+        }
         ui.separator();
         ui.heading("Relocate moved repository");
         ui.weak("Use this when a repository in Recent repositories was moved or renamed outside GitGat.");
@@ -1085,6 +1132,7 @@ impl GitGatApp {
         ui.label("• Hard reset requires a clean worktree plus typed confirmation.");
         ui.label("• Risky history operations are journaled.");
         ui.label("• Process output redacts GitHub tokens and URL credentials.");
+        ui.label("• GitHub and Azure DevOps credentials remain owned by their provider CLIs.");
     }
 }
 
