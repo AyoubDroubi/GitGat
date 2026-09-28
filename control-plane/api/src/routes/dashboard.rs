@@ -1,5 +1,10 @@
 use crate::state::AppState;
-use axum::{Json, extract::State, http::StatusCode, response::{IntoResponse, Response}};
+use axum::{
+    Json,
+    extract::State,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
