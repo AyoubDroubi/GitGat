@@ -22,10 +22,10 @@ Production: reserved and untouched
 | RUST-011 | Conflicts, stash, worktrees, reflog, recovery, reset/rebase/cherry-pick | DONE | safety tests + UI |
 | RUST-012 | Quality, security and cross-platform hardening | DONE | fmt/clippy/test/audit matrix |
 | RUST-013 | Windows portable EXE and Inno Setup installer | DONE | package workflow artifact |
-| RUST-014 | Strict Git LFS lockable workflow and desktop enforcement | IN PROGRESS | unit tests + two-clone E2E + live LFS |
-| RUST-015 | Cross-platform read-only and lock ownership E2E | TODO | Windows/macOS/Linux two-user fixtures |
-| RUST-016 | Forge provider abstraction (GitHub/Azure DevOps) | TODO | provider contract + GitHub regression |
-| RUST-017 | Azure DevOps Repos/PRs/Pipelines integration | TODO | authenticated Azure Repos live E2E |
+| RUST-014 | Strict Git LFS lockable workflow and desktop enforcement | IN PROGRESS | quality + main live LFS gate pending |
+| RUST-015 | Cross-platform read-only and lock ownership E2E | IN PROGRESS | live lockable/read-only flow added; separate-identity fixture still pending |
+| RUST-016 | Forge provider abstraction (GitHub/Azure DevOps) | IN PROGRESS | implementation present; quality/regression gate pending |
+| RUST-017 | Azure DevOps Repos/PRs/Pipelines integration | IN PROGRESS | implementation present; authenticated Azure live E2E pending |
 | RUST-018 | Provider-side required lock-policy check before merge | TODO | GitHub required check + Azure branch policy |
 | RUST-019 | GitGat Control Plane / admin portal for governance and audit | TODO | policy/audit service + admin UI |
 
