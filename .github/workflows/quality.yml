@@ -8,6 +8,7 @@ on:
       - "Cargo.lock"
       - "rust-toolchain.toml"
       - "src/**"
+      - "tests/**"
       - ".github/workflows/quality.yml"
   pull_request:
     branches: [main]
@@ -16,6 +17,7 @@ on:
       - "Cargo.lock"
       - "rust-toolchain.toml"
       - "src/**"
+      - "tests/**"
       - ".github/workflows/quality.yml"
 
 permissions:
