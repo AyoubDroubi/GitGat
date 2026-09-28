@@ -58,7 +58,7 @@ Production: reserved and untouched
 | G - Operations/Security | RUST-029..032 | observable, secure, recoverable deployable platform |
 | H - Certification | RUST-033..035 | end-to-end validation, runbooks and production release |
 
-Detailed execution plans live in `docs/to-do/RUST-014-*.md` through `RUST-035-*.md`. The master dependency/order view is `docs/to-do/ROADMAP.md`.
+Detailed execution plans live in `docs/to-do/RUST-014-*.md` through `RUST-035-*.md`. The phase roadmap is `docs/to-do/ROADMAP.md`, and hard dependencies/gates are defined in `docs/to-do/EXECUTION-ORDER.md`.
 
 ## Current locking expansion
 
