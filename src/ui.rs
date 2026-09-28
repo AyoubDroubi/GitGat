@@ -571,9 +571,7 @@ impl GitGatApp {
                 let title = self.pr_title.clone();
                 let body = self.pr_body.clone();
                 let base = self.pr_base.clone();
-                let r = self
-                    .forge
-                    .create_pull_request(&repo, &title, &body, &base);
+                let r = self.forge.create_pull_request(&repo, &title, &body, &base);
                 self.finish_forge(r);
             }
         });
