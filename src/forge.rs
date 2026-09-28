@@ -8,6 +8,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+const AZURE_DEVOPS_RESOURCE_ID: &str = "499b84ac-1321-427f-aa17-267ca6975798";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ForgeProviderKind {
     GitHub,
@@ -51,6 +53,20 @@ impl ForgeClient {
         Ok(self.provider(repo)?.label())
     }
 
+    pub fn lfs_transport_warning(&self, repo: &Path) -> Result<Option<String>> {
+        let url = self.origin(repo)?;
+        let Some(identity) = parse_azure_remote(&url) else {
+            return Ok(None);
+        };
+        if identity.ssh_remote {
+            return Ok(Some(
+                "Azure Repos does not support Git LFS over SSH. Change origin to the HTTPS clone URL before using LFS locking."
+                    .to_owned(),
+            ));
+        }
+        Ok(None)
+    }
+
     pub fn auth_status(&self, repo: &Path) -> Result<(bool, Option<String>)> {
         match self.provider(repo)? {
             ForgeProviderKind::GitHub => self.github_auth_status(),
@@ -66,8 +82,8 @@ impl ForgeClient {
                 None,
             ),
             ForgeProviderKind::AzureDevOps => {
-                self.require_azure_https(repo)?;
-                self.runner.run("az", ["login"], None)
+                self.runner
+                    .run("az", ["login", "--allow-no-subscriptions"], None)
             }
         }
     }
@@ -493,20 +509,31 @@ impl ForgeClient {
             .collect())
     }
 
-    fn azure_auth_status(&self, repo: &Path) -> Result<(bool, Option<String>)> {
-        self.require_azure_https(repo)?;
-        let (ok, output) =
-            self.runner
-                .run_allow_failure("az", ["account", "show", "--output", "json"], None)?;
+    fn azure_auth_status(&self, _repo: &Path) -> Result<(bool, Option<String>)> {
+        let (ok, _) = self.runner.run_allow_failure(
+            "az",
+            [
+                "account",
+                "get-access-token",
+                "--resource",
+                AZURE_DEVOPS_RESOURCE_ID,
+                "--query",
+                "expiresOn",
+                "--output",
+                "tsv",
+            ],
+            None,
+        )?;
         if !ok {
             return Ok((false, None));
         }
-        let value: Value = serde_json::from_str(&output).unwrap_or(Value::Null);
-        let account = text_at_any(
-            &value,
-            &[&["user", "name"], &["user", "displayName"], &["name"]],
-        );
-        Ok((true, nonempty(&account)))
+
+        let (_, account) = self.runner.run_allow_failure(
+            "az",
+            ["account", "show", "--query", "user.name", "--output", "tsv"],
+            None,
+        )?;
+        Ok((true, nonempty(account.trim())))
     }
 
     fn azure_snapshot(&self, repo: &Path) -> Result<ForgeSnapshot> {
@@ -774,18 +801,8 @@ impl ForgeClient {
 
     fn azure_identity(&self, repo: &Path) -> Result<AzureRepoIdentity> {
         let url = self.origin(repo)?;
-        let identity = parse_azure_remote(&url)
-            .ok_or_else(|| anyhow::anyhow!("origin is not an Azure DevOps Git remote"))?;
-        if identity.ssh_remote {
-            bail!(
-                "Azure DevOps Git LFS repositories must use an HTTPS origin in GitGat; change the origin from SSH to HTTPS"
-            );
-        }
-        Ok(identity)
-    }
-
-    fn require_azure_https(&self, repo: &Path) -> Result<()> {
-        self.azure_identity(repo).map(|_| ())
+        parse_azure_remote(&url)
+            .ok_or_else(|| anyhow::anyhow!("origin is not an Azure DevOps Git remote"))
     }
 
     fn origin(&self, repo: &Path) -> Result<String> {
