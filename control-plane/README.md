@@ -30,3 +30,26 @@ The API applies migrations at startup.
 - no desktop-user PATs are stored here;
 - a force unlock must eventually re-verify the live provider lock before execution;
 - all sensitive governance mutations will require RBAC and durable audit before being enabled.
+
+
+## Authentication and tenant boundary
+
+Administrative APIs are protected by the Control Plane authentication middleware.
+
+Production:
+- configure `GITGAT_OIDC_ISSUER`;
+- configure `GITGAT_OIDC_AUDIENCE`;
+- configure `GITGAT_OIDC_JWKS_URL`;
+- bearer JWTs are verified against remote JWKS with issuer, audience and required claim checks.
+
+Local development may set `GITGAT_DEV_AUTH_SUBJECT`. Development auth is rejected if the API binds to a non-loopback address, so it cannot be used as a public deployment shortcut.
+
+Organization data is scoped through `organization_memberships`. The current role model is:
+- owner
+- admin
+- repository_admin
+- team_lead
+- developer
+- auditor
+
+The dashboard is organization-scoped. There is intentionally no global unauthenticated governance dashboard.
