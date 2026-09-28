@@ -1,0 +1,100 @@
+name: control-plane-quality
+
+on:
+  push:
+    paths:
+      - "control-plane/**"
+      - ".github/workflows/control-plane-quality.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "control-plane/**"
+      - ".github/workflows/control-plane-quality.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: control-plane-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: gitgat
+          POSTGRES_USER: gitgat
+          POSTGRES_PASSWORD: gitgat
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gitgat -d gitgat"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      GITGAT_DATABASE_URL: postgres://gitgat:gitgat@127.0.0.1:5432/gitgat
+      GITGAT_BIND: 127.0.0.1:8080
+      RUST_LOG: gitgat_control_plane=info
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal --component rustfmt,clippy
+          rustup default 1.98.1
+
+      - name: Format
+        run: cargo fmt --manifest-path control-plane/api/Cargo.toml -- --check
+
+      - name: Clippy
+        run: cargo clippy --manifest-path control-plane/api/Cargo.toml --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --manifest-path control-plane/api/Cargo.toml --all-targets
+
+      - name: Build release
+        run: cargo build --manifest-path control-plane/api/Cargo.toml --release
+
+      - name: Migration and API smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --manifest-path control-plane/api/Cargo.toml --release > /tmp/gitgat-control-plane.log 2>&1 &
+          API_PID=$!
+          trap 'kill "$API_PID" 2>/dev/null || true; cat /tmp/gitgat-control-plane.log' EXIT
+
+          for attempt in $(seq 1 40); do
+            if curl --fail --silent http://127.0.0.1:8080/health/ready > /tmp/ready.json; then
+              break
+            fi
+            sleep 1
+          done
+
+          jq -e '.status == "ready"' /tmp/ready.json
+          curl --fail --silent http://127.0.0.1:8080/api/v1/meta | jq -e '.active_lock_authority == "provider_git_lfs"'
+          curl --fail --silent http://127.0.0.1:8080/api/v1/dashboard/summary | tee /tmp/dashboard.json
+          jq -e '.organizations == 0 and .repositories == 0 and .active_lock_observations == 0' /tmp/dashboard.json
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: control-plane/web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: control-plane/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
