@@ -21,3 +21,17 @@ export type Health = {
   service: string
   version: string
 }
+
+
+export type OrganizationSummary = {
+  id: string
+  slug: string
+  name: string
+  role: string
+}
+
+export type CurrentIdentity = {
+  subject: string
+  email: string | null
+  display_name: string | null
+}
