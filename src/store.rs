@@ -66,7 +66,7 @@ impl Catalog {
     }
 
     pub fn touch_repository(&self, path: &Path) -> Result<()> {
-        let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        let canonical = normalize_existing_path(path);
         let name = canonical
             .file_name()
             .and_then(|v| v.to_str())
@@ -113,6 +113,7 @@ impl Catalog {
     }
 
     pub fn relocate_repository(&self, old: &Path, new: &Path) -> Result<()> {
+        let normalized_old = normalize_existing_path(old);
         let canonical_new = new
             .canonicalize()
             .with_context(|| format!("failed to resolve {}", new.display()))?;
@@ -125,7 +126,7 @@ impl Catalog {
         let changed = connection.execute(
             "UPDATE repositories SET path=?2,name=?3,last_opened_unix=?4 WHERE path=?1",
             params![
-                old.to_string_lossy(),
+                normalized_old.to_string_lossy(),
                 canonical_new.to_string_lossy(),
                 name,
                 now_unix()
@@ -136,7 +137,7 @@ impl Catalog {
         }
         connection.execute(
             "UPDATE workspace_repositories SET repository_path=?2 WHERE repository_path=?1",
-            params![old.to_string_lossy(), canonical_new.to_string_lossy()],
+            params![normalized_old.to_string_lossy(), canonical_new.to_string_lossy()],
         )?;
         Ok(())
     }
@@ -222,7 +223,17 @@ impl Catalog {
 }
 
 fn normalize_existing_path(path: &Path) -> PathBuf {
-    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
+    if let Ok(canonical) = path.canonicalize() {
+        return canonical;
+    }
+
+    if let (Some(parent), Some(name)) = (path.parent(), path.file_name())
+        && let Ok(canonical_parent) = parent.canonicalize()
+    {
+        return canonical_parent.join(name);
+    }
+
+    path.to_path_buf()
 }
 
 fn now_unix() -> i64 {
