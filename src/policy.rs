@@ -114,7 +114,9 @@ impl LockPolicyChecker {
 
         let mut protected = Vec::new();
         for path in changed {
-            if self.is_lockable_at(repo, base, &path)? || self.is_lockable_at(repo, "HEAD", &path)? {
+            if self.is_lockable_at(repo, base, &path)?
+                || self.is_lockable_at(repo, "HEAD", &path)?
+            {
                 protected.push(path);
             }
         }
