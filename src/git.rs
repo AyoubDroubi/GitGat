@@ -599,24 +599,7 @@ impl GitClient {
         }
 
         let locks = self.lfs_verified_locks(repo)?;
-        for path in lockable {
-            let lock = locks
-                .iter()
-                .find(|lock| lock.path.replace('\\', "/") == path);
-            match lock.map(|lock| lock.ownership) {
-                Some(LfsLockOwnership::Ours) => {}
-                Some(LfsLockOwnership::Theirs) => {
-                    let owner = lock
-                        .map(|value| value.owner.as_str())
-                        .unwrap_or("another user");
-                    bail!("{path} is locked by {owner}; GitGat will not stage or commit it");
-                }
-                _ => bail!(
-                    "{path} is lockable and must be locked by you before staging or committing"
-                ),
-            }
-        }
-        Ok(())
+        ensure_lock_ownership(&lockable, &locks)
     }
 
     fn repository_has_lockable_patterns(&self, repo: &Path) -> Result<bool> {
@@ -718,6 +701,27 @@ fn append_lfs_locks(result: &mut Vec<LfsLock>, locks: &[Value], ownership: LfsLo
             ownership,
         });
     }
+}
+
+fn ensure_lock_ownership(paths: &[String], locks: &[LfsLock]) -> Result<()> {
+    for path in paths {
+        let lock = locks
+            .iter()
+            .find(|lock| lock.path.replace('\\', "/") == *path);
+        match lock.map(|lock| lock.ownership) {
+            Some(LfsLockOwnership::Ours) => {}
+            Some(LfsLockOwnership::Theirs) => {
+                let owner = lock
+                    .map(|value| value.owner.as_str())
+                    .unwrap_or("another user");
+                bail!("{path} is locked by {owner}; GitGat will not stage or commit it");
+            }
+            _ => bail!(
+                "{path} is lockable and must be locked by you before staging or committing"
+            ),
+        }
+    }
+    Ok(())
 }
 
 pub fn parse_lfs_locks_json(output: &str) -> Result<Vec<LfsLock>> {
@@ -854,8 +858,11 @@ pub fn parse_worktrees(output: &str) -> Vec<WorktreeInfo> {
 
 #[cfg(test)]
 mod tests {
-    use super::{GitClient, contains_conflict_markers, parse_lfs_locks_json, parse_porcelain_v2};
-    use crate::domain::{ChangeKind, LfsLockOwnership};
+    use super::{
+        GitClient, contains_conflict_markers, ensure_lock_ownership, parse_lfs_locks_json,
+        parse_porcelain_v2,
+    };
+    use crate::domain::{ChangeKind, LfsLock, LfsLockOwnership};
     use crate::store::Catalog;
     use std::process::Command;
     use tempfile::tempdir;
@@ -902,6 +909,37 @@ mod tests {
         .unwrap();
         assert_eq!(plain.len(), 1);
         assert_eq!(plain[0].ownership, LfsLockOwnership::Unknown);
+    }
+
+    #[test]
+    fn requires_owned_lock_for_every_protected_path() {
+        let ours = LfsLock {
+            id: "1".to_owned(),
+            path: "Assets/a.psd".to_owned(),
+            owner: "Ayoub".to_owned(),
+            locked_at: String::new(),
+            ownership: LfsLockOwnership::Ours,
+        };
+        let theirs = LfsLock {
+            id: "2".to_owned(),
+            path: "Assets/b.psd".to_owned(),
+            owner: "Saad".to_owned(),
+            locked_at: String::new(),
+            ownership: LfsLockOwnership::Theirs,
+        };
+
+        assert!(ensure_lock_ownership(&["Assets/a.psd".to_owned()], &[ours.clone()]).is_ok());
+
+        let theirs_error =
+            ensure_lock_ownership(&["Assets/b.psd".to_owned()], &[ours.clone(), theirs])
+                .unwrap_err()
+                .to_string();
+        assert!(theirs_error.contains("locked by Saad"));
+
+        let missing_error = ensure_lock_ownership(&["Assets/c.psd".to_owned()], &[ours])
+            .unwrap_err()
+            .to_string();
+        assert!(missing_error.contains("must be locked by you"));
     }
 
     #[test]
