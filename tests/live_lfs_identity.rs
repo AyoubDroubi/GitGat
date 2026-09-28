@@ -24,6 +24,23 @@ fn git(cwd: &Path, args: &[&str]) -> String {
     String::from_utf8_lossy(&output.stdout).trim().to_owned()
 }
 
+fn make_writable(path: &Path) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = std::fs::metadata(path).unwrap().permissions();
+        permissions.set_mode(permissions.mode() | 0o200);
+        std::fs::set_permissions(path, permissions).unwrap();
+    }
+
+    #[cfg(windows)]
+    {
+        let mut permissions = std::fs::metadata(path).unwrap().permissions();
+        permissions.set_readonly(false);
+        std::fs::set_permissions(path, permissions).unwrap();
+    }
+}
+
 fn live_fixture() -> (tempfile::TempDir, GitClient, PathBuf, String) {
     let repo = PathBuf::from(
         std::env::var("GITGAT_LIVE_REPO")
@@ -60,9 +77,7 @@ fn teammate_lock_blocks_stage_commit_and_push() {
 
     // Simulate a user deliberately bypassing the read-only bit outside GitGat.
     let file = repo.join(&path);
-    let mut permissions = std::fs::metadata(&file).unwrap().permissions();
-    permissions.set_readonly(false);
-    std::fs::set_permissions(&file, permissions).unwrap();
+    make_writable(&file);
     std::fs::write(&file, b"teammate attempted edit\n").unwrap();
 
     let stage_error = client
