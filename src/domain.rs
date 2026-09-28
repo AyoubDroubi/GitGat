@@ -73,12 +73,20 @@ pub struct ReflogEntry {
     pub subject: String,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum LfsLockOwnership {
+    Ours,
+    Theirs,
+    Unknown,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LfsLock {
     pub id: String,
     pub path: String,
     pub owner: String,
     pub locked_at: String,
+    pub ownership: LfsLockOwnership,
 }
 
 #[derive(Debug, Clone, Default)]
