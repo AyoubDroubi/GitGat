@@ -35,8 +35,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn run_lock_policy(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
-    let base = arg_value(args, "--base").ok_or("--check-lock-policy requires --base <ref>")?;
-    let actor = arg_value(args, "--actor").ok_or("--check-lock-policy requires --actor <identity>")?;
+    let base = arg_value(args, "--base").ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "--check-lock-policy requires --base <ref>",
+        )
+    })?;
+    let actor = arg_value(args, "--actor").ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "--check-lock-policy requires --actor <identity>",
+        )
+    })?;
     let repo = arg_value(args, "--repo")
         .map(PathBuf::from)
         .unwrap_or(std::env::current_dir()?);
