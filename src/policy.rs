@@ -12,6 +12,7 @@ pub enum LockPolicyStatus {
     NotApplicable,
     FailLockMissing,
     FailLockOwnedByOther,
+    FailPolicyChanged,
     FailPolicyUnavailable,
 }
 
@@ -81,9 +82,35 @@ impl LockPolicyChecker {
             .unwrap_or_default();
 
         let changed = self.changed_paths(repo, base)?;
+        let policy_files = changed
+            .iter()
+            .filter(|path| is_attributes_file(path))
+            .cloned()
+            .collect::<Vec<_>>();
+        if !policy_files.is_empty() {
+            return Ok(LockPolicyReport {
+                status: LockPolicyStatus::FailPolicyChanged,
+                actor: actor.to_owned(),
+                repository,
+                base: base.to_owned(),
+                base_sha,
+                head_sha,
+                protected_paths: Vec::new(),
+                violations: policy_files
+                    .into_iter()
+                    .map(|path| LockPolicyViolation {
+                        path,
+                        code: LockPolicyStatus::FailPolicyChanged,
+                        owner: None,
+                        message: "Lock policy file changed. Protected-pattern changes require the dedicated administrator policy workflow.".to_owned(),
+                    })
+                    .collect(),
+            });
+        }
+
         let mut protected = Vec::new();
         for path in changed {
-            if self.is_lockable(repo, &path)? {
+            if self.is_lockable_at(repo, base, &path)? || self.is_lockable_at(repo, "HEAD", &path)? {
                 protected.push(path);
             }
         }
@@ -142,21 +169,24 @@ impl LockPolicyChecker {
             .collect())
     }
 
-    fn is_lockable(&self, repo: &Path, path: &str) -> Result<bool> {
-        let (ok, output) = self.runner.run_allow_failure(
+    fn is_lockable_at(&self, repo: &Path, source: &str, path: &str) -> Result<bool> {
+        let source_arg = format!("--source={source}");
+        let output = self.runner.run(
             "git",
-            ["check-attr", "lockable", "--", path],
+            ["check-attr", &source_arg, "lockable", "--", path],
             Some(repo),
         )?;
-        if !ok {
-            return Ok(false);
-        }
         let value = output
             .rsplit_once(':')
             .map(|(_, value)| value.trim())
             .unwrap_or_default();
         Ok(matches!(value, "set" | "true" | "yes" | "on"))
     }
+}
+
+fn is_attributes_file(path: &str) -> bool {
+    let normalized = path.replace('\\', "/");
+    normalized == ".gitattributes" || normalized.ends_with("/.gitattributes")
 }
 
 pub fn evaluate_lock_policy(
@@ -267,6 +297,13 @@ mod tests {
         assert_eq!(report.status, LockPolicyStatus::Pass);
         assert!(report.violations.is_empty());
         assert!(report.allows_merge());
+    }
+
+    #[test]
+    fn recognizes_attribute_policy_files() {
+        assert!(super::is_attributes_file(".gitattributes"));
+        assert!(super::is_attributes_file("Assets/.gitattributes"));
+        assert!(!super::is_attributes_file("docs/gitattributes.md"));
     }
 
     #[test]
