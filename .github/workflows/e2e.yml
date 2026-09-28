@@ -102,7 +102,8 @@ jobs:
 
           mkdir -p e2e
           git lfs install --local
-          git lfs track "$LOCK_PATH"
+          git config lfs.setlockablereadonly true
+          git lfs track --lockable "$LOCK_PATH"
           printf 'GitGat live GitHub E2E run %s\n' "$GITHUB_RUN_ID" > e2e/live.txt
           printf 'lock validation %s\n' "$GITHUB_RUN_ID" > "$LOCK_PATH"
           git add .gitattributes e2e/live.txt "$LOCK_PATH"
@@ -116,9 +117,17 @@ jobs:
         run: |
           set -euo pipefail
           git lfs lock "$LOCK_PATH"
+          test -w "$LOCK_PATH"
+
+          git lfs locks --verify --json | tee /tmp/locks-verify.json
+          jq -e --arg path "$LOCK_PATH" 'any(.ours[]?; .path == $path) and ([.theirs[]? | select(.path == $path)] | length) == 0' /tmp/locks-verify.json
+
           git lfs locks --json | tee /tmp/locks.json
           jq -e --arg path "$LOCK_PATH" 'any(.[]?; .path == $path)' /tmp/locks.json
+
           git lfs unlock "$LOCK_PATH"
+          test ! -w "$LOCK_PATH"
+
           git lfs locks --json | tee /tmp/locks-after.json
           jq -e --arg path "$LOCK_PATH" '([.[]? | select(.path == $path)] | length) == 0' /tmp/locks-after.json
 
