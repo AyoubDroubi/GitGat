@@ -1,1 +1,60 @@
-name: gitgat-lock-policy\n\non:\n  pull_request:\n    branches: [main]\n    types: [opened, synchronize, reopened, ready_for_review]\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: gitgat-lock-policy-${{ github.event.pull_request.number }}\n  cancel-in-progress: true\n\njobs:\n  validate-lock-policy:\n    if: github.event.pull_request.draft == false\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 0\n\n      - name: Install Rust toolchain\n        run: |\n          rustup toolchain install 1.98.1 --profile minimal\n          rustup default 1.98.1\n\n      - name: Install native dependencies\n        run: |\n          sudo apt-get update\n          sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxi-dev libxcursor-dev libxrandr-dev libxinerama-dev libgl1-mesa-dev\n\n      - name: Prepare Git LFS\n        run: |\n          git lfs version\n          git lfs install --local\n          git fetch origin "${{ github.base_ref }}"\n\n      - name: Evaluate protected-file lock policy\n        env:\n          BASE_REF: origin/${{ github.base_ref }}\n          ACTOR: ${{ github.event.pull_request.user.login }}\n        run: |\n          set -euo pipefail\n          cargo run --release -- \\n            --check-lock-policy \\n            --base "$BASE_REF" \\n            --actor "$ACTOR" | tee gitgat-lock-policy.json\n\n      - name: Publish policy summary\n        if: always()\n        shell: bash\n        run: |\n          echo "## GitGat Lock Policy" >> "$GITHUB_STEP_SUMMARY"\n          if [ -f gitgat-lock-policy.json ]; then\n            cat gitgat-lock-policy.json >> "$GITHUB_STEP_SUMMARY"\n          else\n            echo "Policy evaluation did not produce a report." >> "$GITHUB_STEP_SUMMARY"\n          fi\n
+name: gitgat-lock-policy
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gitgat-lock-policy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate-lock-policy:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal
+          rustup default 1.98.1
+
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxi-dev libxcursor-dev libxrandr-dev libxinerama-dev libgl1-mesa-dev
+
+      - name: Prepare Git LFS
+        run: |
+          git lfs version
+          git lfs install --local
+          git fetch origin "${{ github.base_ref }}"
+
+      - name: Evaluate protected-file lock policy
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+          ACTOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          set -euo pipefail
+          cargo run --release -- \
+            --check-lock-policy \
+            --base "$BASE_REF" \
+            --actor "$ACTOR" | tee gitgat-lock-policy.json
+
+      - name: Publish policy summary
+        if: always()
+        shell: bash
+        run: |
+          echo "## GitGat Lock Policy" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f gitgat-lock-policy.json ]; then
+            cat gitgat-lock-policy.json >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Policy evaluation did not produce a report." >> "$GITHUB_STEP_SUMMARY"
+          fi
