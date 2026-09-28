@@ -711,37 +711,41 @@ fn string_at(value: &Value, path: &[&str]) -> String {
     current.as_str().unwrap_or_default().to_owned()
 }
 
+fn append_lfs_locks(
+    result: &mut Vec<LfsLock>,
+    locks: &[Value],
+    ownership: LfsLockOwnership,
+) {
+    for lock in locks {
+        result.push(LfsLock {
+            id: string_at(lock, &["id"]),
+            path: string_at(lock, &["path"]),
+            owner: string_at(lock, &["owner", "name"]),
+            locked_at: string_at(lock, &["locked_at"]),
+            ownership,
+        });
+    }
+}
+
 pub fn parse_lfs_locks_json(output: &str) -> Result<Vec<LfsLock>> {
     let value: Value = serde_json::from_str(output)?;
     let mut result = Vec::new();
 
-    let mut push_locks = |locks: &[Value], ownership: LfsLockOwnership| {
-        for lock in locks {
-            result.push(LfsLock {
-                id: string_at(lock, &["id"]),
-                path: string_at(lock, &["path"]),
-                owner: string_at(lock, &["owner", "name"]),
-                locked_at: string_at(lock, &["locked_at"]),
-                ownership,
-            });
-        }
-    };
-
     if let Some(locks) = value.as_array() {
-        push_locks(locks, LfsLockOwnership::Unknown);
+        append_lfs_locks(&mut result, locks, LfsLockOwnership::Unknown);
         return Ok(result);
     }
 
     if let Some(ours) = value.get("ours").and_then(Value::as_array) {
-        push_locks(ours, LfsLockOwnership::Ours);
+        append_lfs_locks(&mut result, ours, LfsLockOwnership::Ours);
     }
     if let Some(theirs) = value.get("theirs").and_then(Value::as_array) {
-        push_locks(theirs, LfsLockOwnership::Theirs);
+        append_lfs_locks(&mut result, theirs, LfsLockOwnership::Theirs);
     }
     if result.is_empty()
         && let Some(locks) = value.get("locks").and_then(Value::as_array)
     {
-        push_locks(locks, LfsLockOwnership::Unknown);
+        append_lfs_locks(&mut result, locks, LfsLockOwnership::Unknown);
     }
     Ok(result)
 }
