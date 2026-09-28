@@ -4,6 +4,8 @@ use std::path::Path;
 use std::process::{Command, Output};
 use tempfile::TempDir;
 
+// E2E tests use isolated repositories and never touch the developer's working tree.
+
 fn command(cwd: &Path, args: &[&str]) -> Output {
     Command::new("git")
         .args(args)
