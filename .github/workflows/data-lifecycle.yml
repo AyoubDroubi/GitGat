@@ -1,0 +1,71 @@
+name: control-plane-data-lifecycle
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "control-plane/migrations/**"
+      - "control-plane/scripts/restore-drill.sh"
+      - ".github/workflows/data-lifecycle.yml"
+  pull_request:
+    paths:
+      - "control-plane/migrations/**"
+      - "control-plane/scripts/restore-drill.sh"
+      - ".github/workflows/data-lifecycle.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  restore-drill:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: gitgat
+          POSTGRES_PASSWORD: gitgat
+          POSTGRES_DB: gitgat_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gitgat -d gitgat_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://gitgat:gitgat@localhost:5432/gitgat_test
+      SOURCE_DATABASE_URL: postgres://gitgat:gitgat@localhost:5432/gitgat_test
+      RESTORE_DATABASE_URL: postgres://gitgat:gitgat@localhost:5432/gitgat_restore
+    defaults:
+      run:
+        working-directory: control-plane
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.95"
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Apply migrations
+        run: |
+          cargo run >/tmp/gitgat-cp.log 2>&1 &
+          pid=$!
+          for i in {1..45}; do
+            if curl -fsS http://127.0.0.1:8080/ready >/dev/null; then
+              kill "$pid" || true
+              wait "$pid" || true
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8080/ready >/dev/null 2>&1 && exit 1 || true
+      - name: Insert restore fixture
+        run: |
+          psql "$SOURCE_DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO organizations (slug, name) VALUES ('restore-drill', 'Restore Drill');
+          SQL
+      - name: Create empty restore database
+        run: psql postgres://gitgat:gitgat@localhost:5432/postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE gitgat_restore'
+      - name: Prove backup and restore
+        run: bash scripts/restore-drill.sh
