@@ -463,14 +463,11 @@ fn is_unique_violation(error: &sqlx::Error) -> bool {
 fn valid_slug(value: &str) -> bool {
     let length = value.len();
     (2..=63).contains(&length)
-        && value
-            .bytes()
-            .enumerate()
-            .all(|(index, byte)| match byte {
-                b'a'..=b'z' | b'0'..=b'9' => true,
-                b'-' => index > 0 && index + 1 < length,
-                _ => false,
-            })
+        && value.bytes().enumerate().all(|(index, byte)| match byte {
+            b'a'..=b'z' | b'0'..=b'9' => true,
+            b'-' => index > 0 && index + 1 < length,
+            _ => false,
+        })
 }
 
 #[cfg(test)]
