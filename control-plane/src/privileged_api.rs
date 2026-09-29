@@ -47,13 +47,11 @@ async fn approve_force_unlock(
     Path(request_id): Path<Uuid>,
     Json(input): Json<ApprovalInput>,
 ) -> Result<Json<StatusResponse>, ApiError> {
-    let preliminary = sqlx::query(
-        "SELECT repository_id FROM force_unlock_requests WHERE id = $1",
-    )
-    .bind(request_id)
-    .fetch_optional(&state.pool)
-    .await?
-    .ok_or(ApiError::NotFound)?;
+    let preliminary = sqlx::query("SELECT repository_id FROM force_unlock_requests WHERE id = $1")
+        .bind(request_id)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or(ApiError::NotFound)?;
     let repository_id: Uuid = preliminary.get("repository_id");
 
     let approver = authz::require_repository_permission(
@@ -157,8 +155,7 @@ async fn create_exception(
     }
 
     if let Some(repository_id) = input.repository_id {
-        let repository_org =
-            authz::repository_organization(&state.pool, repository_id).await?;
+        let repository_org = authz::repository_organization(&state.pool, repository_id).await?;
         if repository_org != organization_id {
             return Err(ApiError::Forbidden);
         }
