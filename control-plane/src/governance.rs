@@ -42,7 +42,10 @@ mod tests {
 
     #[test]
     fn patterns_are_repository_relative_and_normalized() {
-        assert_eq!(normalize_pattern(r"assets\**\*.psd"), Some("assets/**/*.psd".into()));
+        assert_eq!(
+            normalize_pattern(r"assets\**\*.psd"),
+            Some("assets/**/*.psd".into())
+        );
         assert_eq!(normalize_pattern("../secret"), None);
         assert_eq!(normalize_pattern("/absolute"), None);
     }
