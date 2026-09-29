@@ -5,11 +5,7 @@ mod meta;
 mod organizations;
 
 use crate::state::AppState;
-use axum::{
-    Router,
-    middleware,
-    routing::get,
-};
+use axum::{Router, middleware, routing::get};
 
 pub fn router(state: AppState) -> Router {
     let protected = Router::new()
