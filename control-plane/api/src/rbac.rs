@@ -107,12 +107,7 @@ impl Role {
                 ViewLocks,
                 RequestForceUnlock,
             ],
-            Self::Auditor => &[
-                ViewOrganization,
-                ViewRepositories,
-                ViewLocks,
-                ViewAudit,
-            ],
+            Self::Auditor => &[ViewOrganization, ViewRepositories, ViewLocks, ViewAudit],
         }
     }
 
