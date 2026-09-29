@@ -1,4 +1,5 @@
 use crate::{
+    audit::{self, AuditEventInput},
     auth::AuthenticatedIdentity,
     authz::{self, Permission},
     error::ApiError,
@@ -64,7 +65,8 @@ async fn approve_force_unlock(
 
     let mut tx = state.pool.begin().await?;
     let row = sqlx::query(
-        "SELECT requester_user_id, status
+        "SELECT organization_id, repository_id, requester_user_id, status, path,
+                provider_lock_id, current_owner, reason
          FROM force_unlock_requests
          WHERE id = $1
          FOR UPDATE",
@@ -74,8 +76,19 @@ async fn approve_force_unlock(
     .await?
     .ok_or(ApiError::NotFound)?;
 
+    let organization_id: Uuid = row.get("organization_id");
+    let locked_repository_id: Uuid = row.get("repository_id");
     let requester: Uuid = row.get("requester_user_id");
     let status: String = row.get("status");
+    let path: String = row.get("path");
+    let provider_lock_id: String = row.get("provider_lock_id");
+    let current_owner: String = row.get("current_owner");
+    let request_reason: String = row.get("reason");
+    if locked_repository_id != repository_id {
+        return Err(ApiError::Conflict(
+            "force-unlock request repository changed during authorization".into(),
+        ));
+    }
     if requester == approver {
         return Err(ApiError::Forbidden);
     }
@@ -92,7 +105,7 @@ async fn approve_force_unlock(
     )
     .bind(request_id)
     .bind(approver)
-    .bind(input.reason)
+    .bind(&input.reason)
     .execute(&mut *tx)
     .await?;
 
@@ -103,6 +116,30 @@ async fn approve_force_unlock(
     )
     .bind(request_id)
     .execute(&mut *tx)
+    .await?;
+
+    let target_id = request_id.to_string();
+    audit::append_event(
+        &mut tx,
+        AuditEventInput {
+            organization_id,
+            actor_id: &identity.subject,
+            actor_type: "user",
+            action: "force_unlock.approved",
+            target_type: "force_unlock_request",
+            target_id: Some(&target_id),
+            repository_id: Some(repository_id),
+            path: Some(&path),
+            reason: input.reason.as_deref().or(Some(&request_reason)),
+            outcome: "approved",
+            correlation_id: None,
+            evidence_reference: Some(&provider_lock_id),
+            payload: serde_json::json!({
+                "current_owner": current_owner,
+                "approver_user_id": approver,
+            }),
+        },
+    )
     .await?;
     tx.commit().await?;
 
@@ -148,7 +185,10 @@ async fn create_exception(
     let Some(path_pattern) = normalize_pattern(&input.path_pattern) else {
         return Err(ApiError::BadRequest("invalid path pattern".into()));
     };
-    if input.reason.trim().is_empty() || input.expires_at <= input.starts_at {
+    if input.reason.trim().is_empty()
+        || input.expires_at <= input.starts_at
+        || input.expires_at <= Utc::now()
+    {
         return Err(ApiError::BadRequest(
             "reason and a valid exception window are required".into(),
         ));
@@ -161,6 +201,7 @@ async fn create_exception(
         }
     }
 
+    let mut tx = state.pool.begin().await?;
     let id = sqlx::query_scalar::<_, Uuid>(
         "INSERT INTO policy_exceptions
             (organization_id, repository_id, subject_external_id, path_pattern, reason,
@@ -176,9 +217,35 @@ async fn create_exception(
     .bind(approver)
     .bind(input.starts_at)
     .bind(input.expires_at)
-    .bind(input.linked_reference)
-    .fetch_one(&state.pool)
+    .bind(&input.linked_reference)
+    .fetch_one(&mut *tx)
     .await?;
+
+    let target_id = id.to_string();
+    audit::append_event(
+        &mut tx,
+        AuditEventInput {
+            organization_id,
+            actor_id: &identity.subject,
+            actor_type: "user",
+            action: "policy_exception.created",
+            target_type: "policy_exception",
+            target_id: Some(&target_id),
+            repository_id: input.repository_id,
+            path: Some(&path_pattern),
+            reason: Some(&input.reason),
+            outcome: "created",
+            correlation_id: None,
+            evidence_reference: input.linked_reference.as_deref(),
+            payload: serde_json::json!({
+                "subject_external_id": input.subject_external_id,
+                "starts_at": input.starts_at,
+                "expires_at": input.expires_at,
+            }),
+        },
+    )
+    .await?;
+    tx.commit().await?;
 
     Ok(Json(ExceptionView {
         id,
