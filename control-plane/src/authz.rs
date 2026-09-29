@@ -119,10 +119,7 @@ pub async fn require_org_permission(
     Ok(user_id)
 }
 
-pub async fn repository_organization(
-    pool: &PgPool,
-    repository_id: Uuid,
-) -> Result<Uuid, ApiError> {
+pub async fn repository_organization(pool: &PgPool, repository_id: Uuid) -> Result<Uuid, ApiError> {
     sqlx::query_scalar::<_, Uuid>(
         "SELECT organization_id FROM repository_registrations WHERE id = $1",
     )
