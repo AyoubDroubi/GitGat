@@ -56,6 +56,7 @@ async fn ingest(
     };
 
     let payload_hash = format!("{:x}", Sha256::digest(&payload));
+    let repository_external_id = extract_repository_id(&provider, &payload);
     let mut tx = state.pool.begin().await?;
 
     let inserted = sqlx::query(
@@ -97,6 +98,7 @@ async fn ingest(
         "delivery_id": delivery_id,
         "event_type": event_type,
         "payload_sha256": payload_hash,
+        "repository_external_id": repository_external_id,
     }))
     .execute(&mut *tx)
     .await?;
@@ -110,6 +112,25 @@ async fn ingest(
             delivery_id,
         }),
     ))
+}
+
+fn extract_repository_id(provider: &str, payload: &[u8]) -> Option<String> {
+    let json: serde_json::Value = serde_json::from_slice(payload).ok()?;
+    match provider {
+        "github" => json
+            .pointer("/repository/id")
+            .and_then(|value| {
+                value
+                    .as_u64()
+                    .map(|id| id.to_string())
+                    .or_else(|| value.as_str().map(str::to_owned))
+            }),
+        "azure_devops" => json
+            .pointer("/resource/repository/id")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned),
+        _ => None,
+    }
 }
 
 fn authenticate_github(
