@@ -137,8 +137,10 @@ pub async fn require_repository_permission(
 ) -> Result<Uuid, ApiError> {
     let organization_id = repository_organization(pool, repository_id).await?;
 
-    if let Ok(user_id) = require_org_permission(pool, subject, organization_id, permission).await {
-        return Ok(user_id);
+    match require_org_permission(pool, subject, organization_id, permission).await {
+        Ok(user_id) => return Ok(user_id),
+        Err(ApiError::Forbidden) => {}
+        Err(error) => return Err(error),
     }
 
     let row = sqlx::query_as::<_, (Uuid, String)>(
