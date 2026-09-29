@@ -73,4 +73,13 @@ jobs:
         with:
           toolchain: "1.95"
       - uses: taiki-e/install-action@cargo-audit
-      - run: cargo audit
+      - name: Prove advisory is outside the active build graph
+        run: |
+          if cargo tree --edges normal -i rsa 2>/dev/null | grep -q '^rsa '; then
+            echo "rsa is active in the Control Plane dependency graph"
+            cargo tree --edges normal -i rsa
+            exit 1
+          fi
+          echo "rsa is lock-only through an inactive optional database driver"
+      - name: Dependency audit
+        run: cargo audit --ignore RUSTSEC-2023-0071
