@@ -24,7 +24,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn rejects_non_secret-store_references() {
+    fn rejects_non_secret_store_references() {
         assert!(resolve_secret("plaintext:secret").is_err());
         assert!(resolve_secret("env:bad-name").is_err());
     }
