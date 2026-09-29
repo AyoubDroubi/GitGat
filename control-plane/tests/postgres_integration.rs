@@ -4,7 +4,9 @@ use uuid::Uuid;
 
 async fn migrated_pool() -> PgPool {
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let pool = PgPool::connect(&database_url).await.expect("connect PostgreSQL");
+    let pool = PgPool::connect(&database_url)
+        .await
+        .expect("connect PostgreSQL");
     sqlx::migrate!().run(&pool).await.expect("run migrations");
     pool
 }
@@ -18,7 +20,7 @@ async fn migrations_and_readiness_query_work() {
         .expect("readiness query");
     assert_eq!(value, 1);
 
-    let state = AppState { pool };
+    let state = AppState::new(pool, None);
     let count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM organizations")
         .fetch_one(&state.pool)
         .await
