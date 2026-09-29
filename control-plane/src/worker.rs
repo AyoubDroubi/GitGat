@@ -137,12 +137,7 @@ async fn process_webhook(
     Ok(())
 }
 
-async fn fail_job(
-    pool: &PgPool,
-    id: Uuid,
-    attempts: i32,
-    error: &str,
-) -> Result<(), sqlx::Error> {
+async fn fail_job(pool: &PgPool, id: Uuid, attempts: i32, error: &str) -> Result<(), sqlx::Error> {
     if should_dead_letter(attempts) {
         sqlx::query(
             "UPDATE background_jobs
