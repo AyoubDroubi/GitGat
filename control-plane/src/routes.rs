@@ -1,5 +1,5 @@
-use crate::{error::ApiError, state::AppState};
-use axum::{Json, Router, extract::State, routing::get};
+use crate::{admin_api, error::ApiError, state::AppState};
+use axum::{Json, Router, extract::State, response::Html, routing::get};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -10,12 +10,24 @@ struct Health {
 
 pub fn router() -> Router<AppState> {
     Router::new()
+        .route("/", get(root))
+        .route("/admin", get(admin))
         .route("/health", get(health))
         .route("/ready", get(ready))
         .nest(
             "/api/v1",
-            Router::new().route("/governance/summary", get(summary)),
+            Router::new()
+                .route("/governance/summary", get(summary))
+                .merge(admin_api::router()),
         )
+}
+
+async fn root() -> &'static str {
+    "GitGat Control Plane"
+}
+
+async fn admin() -> Html<&'static str> {
+    Html(include_str!("../admin/index.html"))
 }
 
 async fn health() -> Json<Health> {
