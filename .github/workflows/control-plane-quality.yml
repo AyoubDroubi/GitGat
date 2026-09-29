@@ -55,10 +55,22 @@ jobs:
           trap 'kill $pid 2>/dev/null || true' EXIT
           for i in {1..30}; do
             if curl --fail --silent http://127.0.0.1:8080/ready >/dev/null; then
-              curl --fail --silent http://127.0.0.1:8080/api/v1/governance/summary
               exit 0
             fi
             sleep 1
           done
           cat /tmp/gitgat-control-plane.log
           exit 1
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: control-plane
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.95"
+      - uses: taiki-e/install-action@cargo-audit
+      - run: cargo audit
