@@ -11,8 +11,14 @@ pub enum ApiError {
     Database(#[from] sqlx::Error),
     #[error("resource not found")]
     NotFound,
+    #[error("authentication required")]
+    Unauthorized,
     #[error("forbidden")]
     Forbidden,
+    #[error("invalid request: {0}")]
+    BadRequest(String),
+    #[error("conflict: {0}")]
+    Conflict(String),
 }
 
 #[derive(Serialize)]
@@ -26,7 +32,10 @@ impl IntoResponse for ApiError {
         let (status, code) = match self {
             Self::Database(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal.database"),
             Self::NotFound => (StatusCode::NOT_FOUND, "common.not_found"),
+            Self::Unauthorized => (StatusCode::UNAUTHORIZED, "auth.unauthorized"),
             Self::Forbidden => (StatusCode::FORBIDDEN, "auth.forbidden"),
+            Self::BadRequest(_) => (StatusCode::BAD_REQUEST, "common.bad_request"),
+            Self::Conflict(_) => (StatusCode::CONFLICT, "common.conflict"),
         };
         (
             status,
