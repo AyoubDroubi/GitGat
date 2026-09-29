@@ -1,3 +1,4 @@
+pub mod control_plane;
 pub mod domain;
 pub mod forge;
 pub mod git;
