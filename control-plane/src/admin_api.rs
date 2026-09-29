@@ -262,7 +262,11 @@ async fn put_policy(
         .collect();
     let (protected, excluded) = match (protected, excluded) {
         (Some(protected), Some(excluded)) => (protected, excluded),
-        _ => return Err(ApiError::BadRequest("invalid repository-relative pattern".into())),
+        _ => {
+            return Err(ApiError::BadRequest(
+                "invalid repository-relative pattern".into(),
+            ));
+        }
     };
 
     let row = sqlx::query(
