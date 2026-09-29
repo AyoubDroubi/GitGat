@@ -1145,8 +1145,7 @@ impl GitGatApp {
                         .duration_since(UNIX_EPOCH)
                         .unwrap_or_default()
                         .as_secs() as i64;
-                    let fresh =
-                        managed.policy_is_fresh_at(now, POLICY_CACHE_MAX_AGE_SECONDS);
+                    let fresh = managed.policy_is_fresh_at(now, POLICY_CACHE_MAX_AGE_SECONDS);
                     if let Some(policy) = managed.policy {
                         ui.label(format!(
                             "Managed policy v{} • {}",
