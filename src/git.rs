@@ -597,6 +597,17 @@ impl GitClient {
         repo: &Path,
         paths: &[String],
     ) -> Result<()> {
+        if self.catalog.managed_repository(repo)?.is_some()
+            && paths.iter().any(|path| {
+                let normalized = path.replace('\\', "/");
+                normalized == ".gitattributes" || normalized.ends_with("/.gitattributes")
+            })
+        {
+            bail!(
+                "organization-managed lock policy files cannot be changed from the desktop; use the audited administrator policy workflow"
+            );
+        }
+
         let mut has_lockable = false;
         for path in paths {
             if self.is_lfs_lockable(repo, path)? {
