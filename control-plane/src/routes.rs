@@ -1,4 +1,4 @@
-use crate::{admin_api, error::ApiError, state::AppState};
+use crate::{admin_api, error::ApiError, privileged_api, state::AppState};
 use axum::{Json, Router, extract::State, response::Html, routing::get};
 use serde::Serialize;
 
@@ -18,7 +18,8 @@ pub fn router() -> Router<AppState> {
             "/api/v1",
             Router::new()
                 .route("/governance/summary", get(summary))
-                .merge(admin_api::router()),
+                .merge(admin_api::router())
+                .merge(privileged_api::router()),
         )
 }
 
