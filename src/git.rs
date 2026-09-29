@@ -1,3 +1,4 @@
+use crate::control_plane::POLICY_CACHE_MAX_AGE_SECONDS;
 use crate::domain::{
     BranchInfo, ChangeKind, CommitInfo, FileChange, LfsLock, LfsLockOwnership, ReflogEntry,
     RepositorySnapshot, RepositoryStatus, StashInfo, WorktreeInfo,
@@ -7,6 +8,7 @@ use crate::store::Catalog;
 use anyhow::{Context, Result, bail};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Copy)]
 pub enum ConflictChoice {
@@ -131,6 +133,7 @@ impl GitClient {
 
     pub fn stage(&self, repo: &Path, paths: &[String]) -> Result<()> {
         require_paths(paths)?;
+        self.require_managed_policy_for_lockable_paths(repo, paths)?;
         self.require_owned_locks(repo, paths)?;
         let mut args = vec!["add".to_owned(), "--".to_owned()];
         args.extend(paths.iter().cloned());
@@ -173,6 +176,7 @@ impl GitClient {
             bail!("commit message is required");
         }
         let staged = self.staged_paths(repo)?;
+        self.require_managed_policy_for_lockable_paths(repo, &staged)?;
         self.require_owned_locks(repo, &staged)?;
         self.runner
             .run("git", ["commit", "-m", message.trim()], Some(repo))
@@ -185,6 +189,7 @@ impl GitClient {
         self.runner.run("git", ["pull", "--ff-only"], Some(repo))
     }
     pub fn push(&self, repo: &Path) -> Result<String> {
+        self.require_managed_policy_fresh(repo)?;
         if self.repository_has_lockable_patterns(repo)? {
             self.lfs_enable_strict_locking(repo)?;
         }
@@ -585,6 +590,40 @@ impl GitClient {
             .filter(|path| !path.is_empty())
             .map(str::to_owned)
             .collect())
+    }
+
+    fn require_managed_policy_for_lockable_paths(
+        &self,
+        repo: &Path,
+        paths: &[String],
+    ) -> Result<()> {
+        let mut has_lockable = false;
+        for path in paths {
+            if self.is_lfs_lockable(repo, path)? {
+                has_lockable = true;
+                break;
+            }
+        }
+        if has_lockable {
+            self.require_managed_policy_fresh(repo)?;
+        }
+        Ok(())
+    }
+
+    fn require_managed_policy_fresh(&self, repo: &Path) -> Result<()> {
+        let Some(managed) = self.catalog.managed_repository(repo)? else {
+            return Ok(());
+        };
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+        if !managed.policy_is_fresh_at(now, POLICY_CACHE_MAX_AGE_SECONDS) {
+            bail!(
+                "organization-managed policy is missing or stale; refresh GitGat Control Plane policy before protected mutations or push"
+            );
+        }
+        Ok(())
     }
 
     fn require_owned_locks(&self, repo: &Path, paths: &[String]) -> Result<()> {
