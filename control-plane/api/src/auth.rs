@@ -6,7 +6,7 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
-use axum_jwt_auth::{Decoder, JwtDecoder, RemoteJwksDecoder};
+use axum_jwt_auth::{Decoder, RemoteJwksDecoder};
 use jsonwebtoken::{Algorithm, Validation};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
