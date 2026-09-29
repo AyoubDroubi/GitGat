@@ -190,6 +190,94 @@ mod tests {
         assert!(!Role::Auditor.allows(Permission::RequestForceUnlock));
     }
 
+    #[tokio::test]
+    async fn organization_membership_is_tenant_scoped_when_database_is_available() {
+        let Ok(database_url) = std::env::var("GITGAT_DATABASE_URL") else {
+            return;
+        };
+
+        let pool = sqlx::PgPool::connect(&database_url).await.unwrap();
+        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+
+        let suffix = uuid::Uuid::new_v4().simple().to_string();
+        let subject = format!("tenant-test-{suffix}");
+        let slug_a = format!("tenant-a-{}", &suffix[..12]);
+        let slug_b = format!("tenant-b-{}", &suffix[..12]);
+
+        let user_id = sqlx::query_scalar::<_, uuid::Uuid>(
+            "INSERT INTO users (subject, display_name) VALUES ($1, $2) RETURNING id",
+        )
+        .bind(&subject)
+        .bind("Tenant Test")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        let organization_a = sqlx::query_scalar::<_, uuid::Uuid>(
+            "INSERT INTO organizations (slug, name) VALUES ($1, $2) RETURNING id",
+        )
+        .bind(&slug_a)
+        .bind("Tenant A")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        let organization_b = sqlx::query_scalar::<_, uuid::Uuid>(
+            "INSERT INTO organizations (slug, name) VALUES ($1, $2) RETURNING id",
+        )
+        .bind(&slug_b)
+        .bind("Tenant B")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            "INSERT INTO organization_memberships (organization_id, user_id, role) VALUES ($1, $2, 'developer')",
+        )
+        .bind(organization_a)
+        .bind(user_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let identity = crate::auth::AuthIdentity {
+            subject,
+            email: None,
+            display_name: None,
+        };
+
+        let allowed = super::require_permission(
+            &pool,
+            &identity,
+            organization_a,
+            Permission::ViewOrganization,
+        )
+        .await
+        .unwrap();
+        assert_eq!(allowed.organization_id, organization_a);
+
+        let denied = super::require_permission(
+            &pool,
+            &identity,
+            organization_b,
+            Permission::ViewOrganization,
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(denied, super::AccessError::NotMember));
+
+        sqlx::query("DELETE FROM organizations WHERE id = ANY($1)")
+            .bind(&[organization_a, organization_b][..])
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM users WHERE id = $1")
+            .bind(user_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+
     #[test]
     fn admins_have_full_governance_permissions() {
         for role in [Role::Owner, Role::Admin] {
