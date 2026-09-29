@@ -1,10 +1,10 @@
 use crate::config::Config;
 use axum::{
+    Json,
     extract::{Request, State},
     http::{StatusCode, header},
     middleware::Next,
     response::{IntoResponse, Response},
-    Json,
 };
 use axum_jwt_auth::{Decoder, JwtDecoder, RemoteJwksDecoder};
 use jsonwebtoken::{Algorithm, Validation};
@@ -164,7 +164,9 @@ pub async fn require_auth(
 
 fn bearer_token(value: Option<&axum::http::HeaderValue>) -> Option<&str> {
     let value = value?.to_str().ok()?;
-    value.strip_prefix("Bearer ").filter(|token| !token.is_empty())
+    value
+        .strip_prefix("Bearer ")
+        .filter(|token| !token.is_empty())
 }
 
 fn auth_error(status: StatusCode, code: &'static str, message: &'static str) -> Response {
