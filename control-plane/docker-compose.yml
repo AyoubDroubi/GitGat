@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: gitgat
+      POSTGRES_USER: gitgat
+      POSTGRES_PASSWORD: gitgat
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gitgat -d gitgat"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - gitgat-control-plane-db:/var/lib/postgresql/data
+
+volumes:
+  gitgat-control-plane-db:

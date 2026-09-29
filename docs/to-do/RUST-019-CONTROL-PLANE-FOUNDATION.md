@@ -1,6 +1,6 @@
 # RUST-019 - GitGat Control Plane / Admin Portal Foundation
 
-Status: TODO
+Status: IN PROGRESS
 
 ## Goal
 Create the organization governance layer without becoming a second lock authority.
@@ -61,3 +61,29 @@ The exact web framework can be finalized before implementation, but API/domain b
 
 ## Acceptance
 The portal can authenticate an admin, enroll a repository and show governance state without changing provider lock truth.
+
+
+## Implementation started
+
+Current branch: `feature/control-plane-foundation`
+
+Implemented foundation:
+- Rust Axum API service;
+- PostgreSQL 17 + SQLx migrations;
+- liveness and database-backed readiness endpoints;
+- service metadata endpoint declaring `provider_git_lfs` as active lock authority;
+- database-backed dashboard summary endpoint;
+- foundation schema for organizations, users, memberships, providers, repositories, policies, lock observations, exceptions, force-unlock requests/approvals, audit, webhooks and provider health;
+- local Docker PostgreSQL development environment;
+- React 19.3 + Vite 8.3 admin web foundation;
+- dashboard shell connected to API summary/health/meta endpoints;
+- dedicated CI gate for Rust quality, PostgreSQL migration/API smoke, and web build.
+
+Intentionally not enabled yet:
+- authentication;
+- RBAC mutations;
+- provider webhook processing;
+- force-unlock execution;
+- policy mutation endpoints.
+
+Those remain gated by RUST-020/RUST-021/RUST-025.
