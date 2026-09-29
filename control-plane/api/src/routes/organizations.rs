@@ -135,7 +135,10 @@ pub async fn create(
     {
         Ok(value) => value,
         Err(error) if is_unique_violation(&error) => {
-            return conflict("organization.slug_exists", "That organization slug is already in use.");
+            return conflict(
+                "organization.slug_exists",
+                "That organization slug is already in use.",
+            );
         }
         Err(error) => return database_error(error),
     };
@@ -237,13 +240,15 @@ pub async fn members(
         Ok(values) => Json(
             values
                 .into_iter()
-                .map(|(user_id, subject, email, display_name, role)| OrganizationMember {
-                    user_id,
-                    subject,
-                    email,
-                    display_name,
-                    role,
-                })
+                .map(
+                    |(user_id, subject, email, display_name, role)| OrganizationMember {
+                        user_id,
+                        subject,
+                        email,
+                        display_name,
+                        role,
+                    },
+                )
                 .collect::<Vec<_>>(),
         )
         .into_response(),
@@ -379,10 +384,7 @@ pub async fn update_member_role(
     StatusCode::NO_CONTENT.into_response()
 }
 
-pub async fn current_user_id(
-    state: &AppState,
-    identity: &AuthIdentity,
-) -> Result<Uuid, Response> {
+pub async fn current_user_id(state: &AppState, identity: &AuthIdentity) -> Result<Uuid, Response> {
     match sqlx::query_scalar::<_, Uuid>(
         "SELECT id FROM users WHERE subject = $1 AND disabled_at IS NULL",
     )
@@ -472,14 +474,11 @@ fn is_unique_violation(error: &sqlx::Error) -> bool {
 fn valid_slug(value: &str) -> bool {
     let length = value.len();
     (2..=63).contains(&length)
-        && value
-            .bytes()
-            .enumerate()
-            .all(|(index, byte)| match byte {
-                b'a'..=b'z' | b'0'..=b'9' => true,
-                b'-' => index > 0 && index + 1 < length,
-                _ => false,
-            })
+        && value.bytes().enumerate().all(|(index, byte)| match byte {
+            b'a'..=b'z' | b'0'..=b'9' => true,
+            b'-' => index > 0 && index + 1 < length,
+            _ => false,
+        })
 }
 
 #[cfg(test)]
