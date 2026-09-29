@@ -376,6 +376,46 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn persists_managed_repository_without_persisting_session_tokens() {
+        use crate::domain::ManagedPolicy;
+
+        let root = tempdir().unwrap();
+        let repo = root.path().join("repo");
+        std::fs::create_dir_all(&repo).unwrap();
+        let catalog = Catalog::open(root.path().join("catalog.db")).unwrap();
+        catalog.touch_repository(&repo).unwrap();
+
+        catalog
+            .set_managed_repository(
+                &repo,
+                "https://control.example",
+                "11111111-1111-1111-1111-111111111111",
+            )
+            .unwrap();
+
+        let managed = catalog.managed_repository(&repo).unwrap().unwrap();
+        assert_eq!(managed.control_plane_url, "https://control.example");
+        assert!(managed.policy.is_none());
+
+        let policy = ManagedPolicy {
+            version: 7,
+            protected_patterns: vec!["Assets/**/*.psd".into()],
+            excluded_patterns: vec![],
+            required_lock: true,
+            max_lock_age_minutes: Some(120),
+            force_unlock_approval_required: true,
+        };
+        catalog.update_managed_policy(&repo, &policy).unwrap();
+
+        let managed = catalog.managed_repository(&repo).unwrap().unwrap();
+        assert_eq!(managed.policy.unwrap().version, 7);
+        assert!(managed.policy_fetched_unix.is_some());
+
+        catalog.clear_managed_repository(&repo).unwrap();
+        assert!(catalog.managed_repository(&repo).unwrap().is_none());
+    }
+
     fn relocates_missing_repository_and_workspace_membership() {
         let root = tempdir().unwrap();
         let old = root.path().join("old-repo");
