@@ -49,6 +49,17 @@ pub enum Permission {
 }
 
 impl Role {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Owner => "owner",
+            Self::Admin => "admin",
+            Self::RepositoryAdmin => "repository_admin",
+            Self::TeamLead => "team_lead",
+            Self::Developer => "developer",
+            Self::Auditor => "auditor",
+        }
+    }
+
     pub fn permissions(self) -> &'static [Permission] {
         use Permission::*;
 
