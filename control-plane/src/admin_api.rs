@@ -281,7 +281,7 @@ async fn get_policy(
     .ok_or(ApiError::NotFound)?;
 
     Ok(Json(PolicyView {
-        version,
+        version: row.get("version"),
         protected_patterns: row.get("protected_patterns"),
         excluded_patterns: row.get("excluded_patterns"),
         required_lock: row.get("required_lock"),
@@ -381,7 +381,7 @@ async fn put_policy(
     tx.commit().await?;
 
     Ok(Json(PolicyView {
-        version: row.get("version"),
+        version,
         protected_patterns: row.get("protected_patterns"),
         excluded_patterns: row.get("excluded_patterns"),
         required_lock: row.get("required_lock"),
