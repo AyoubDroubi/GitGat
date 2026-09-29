@@ -57,7 +57,11 @@ impl AuthService {
     ) -> Result<(Self, Option<CancellationToken>), Box<dyn std::error::Error>> {
         if let Some(subject) = config.dev_auth_subject.as_deref() {
             if !config.bind.ip().is_loopback() {
-                return Err("development authentication is allowed only on a loopback bind".into());
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "development authentication is allowed only on a loopback bind",
+                )
+                .into());
             }
             return Ok((
                 Self::Development {
@@ -94,14 +98,16 @@ impl AuthService {
             (None, None, None) if config.bind.ip().is_loopback() => {
                 Ok((Self::Unconfigured, None))
             }
-            (None, None, None) => Err(
-                "OIDC authentication is required when the Control Plane binds to a non-loopback address"
-                    .into(),
-            ),
-            _ => Err(
-                "GITGAT_OIDC_ISSUER, GITGAT_OIDC_AUDIENCE and GITGAT_OIDC_JWKS_URL must be configured together"
-                    .into(),
-            ),
+            (None, None, None) => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "OIDC authentication is required when the Control Plane binds to a non-loopback address",
+            )
+            .into()),
+            _ => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "GITGAT_OIDC_ISSUER, GITGAT_OIDC_AUDIENCE and GITGAT_OIDC_JWKS_URL must be configured together",
+            )
+            .into()),
         }
     }
 
