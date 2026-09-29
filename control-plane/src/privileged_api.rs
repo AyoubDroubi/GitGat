@@ -238,7 +238,7 @@ async fn create_exception(
             correlation_id: None,
             evidence_reference: input.linked_reference.as_deref(),
             payload: serde_json::json!({
-                "subject_external_id": input.subject_external_id,
+                "subject_external_id": &input.subject_external_id,
                 "starts_at": input.starts_at,
                 "expires_at": input.expires_at,
             }),
