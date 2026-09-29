@@ -1,4 +1,5 @@
 use crate::{
+    audit::{self, AuditEventInput},
     auth::AuthenticatedIdentity,
     authz::{self, Permission},
     error::ApiError,
@@ -74,6 +75,7 @@ async fn enroll_repository(
         return Err(ApiError::BadRequest("invalid policy mode".into()));
     }
 
+    let mut tx = state.pool.begin().await?;
     let id = sqlx::query_scalar::<_, Uuid>(
         "INSERT INTO repository_registrations
             (organization_id, provider, provider_repository_id, display_name, policy_mode)
@@ -81,12 +83,38 @@ async fn enroll_repository(
          RETURNING id",
     )
     .bind(organization_id)
-    .bind(input.provider)
-    .bind(input.provider_repository_id)
-    .bind(input.display_name)
-    .bind(input.policy_mode)
-    .fetch_one(&state.pool)
+    .bind(&input.provider)
+    .bind(&input.provider_repository_id)
+    .bind(&input.display_name)
+    .bind(&input.policy_mode)
+    .fetch_one(&mut *tx)
     .await?;
+
+    let target_id = id.to_string();
+    audit::append_event(
+        &mut tx,
+        AuditEventInput {
+            organization_id,
+            actor_id: &identity.subject,
+            actor_type: "user",
+            action: "repository.enrolled",
+            target_type: "repository",
+            target_id: Some(&target_id),
+            repository_id: Some(id),
+            path: None,
+            reason: None,
+            outcome: "created",
+            correlation_id: None,
+            evidence_reference: Some(&input.provider_repository_id),
+            payload: serde_json::json!({
+                "provider": &input.provider,
+                "display_name": &input.display_name,
+                "policy_mode": &input.policy_mode,
+            }),
+        },
+    )
+    .await?;
+    tx.commit().await?;
 
     Ok(Json(IdResponse { id }))
 }
@@ -168,6 +196,7 @@ async fn add_provider_connection(
         ));
     }
 
+    let mut tx = state.pool.begin().await?;
     let id = sqlx::query_scalar::<_, Uuid>(
         "INSERT INTO provider_connections
             (organization_id, provider, external_installation_id, secret_reference)
@@ -175,11 +204,36 @@ async fn add_provider_connection(
          RETURNING id",
     )
     .bind(organization_id)
-    .bind(input.provider)
-    .bind(input.external_installation_id)
-    .bind(input.secret_reference)
-    .fetch_one(&state.pool)
+    .bind(&input.provider)
+    .bind(&input.external_installation_id)
+    .bind(&input.secret_reference)
+    .fetch_one(&mut *tx)
     .await?;
+
+    let target_id = id.to_string();
+    audit::append_event(
+        &mut tx,
+        AuditEventInput {
+            organization_id,
+            actor_id: &identity.subject,
+            actor_type: "user",
+            action: "provider_connection.created",
+            target_type: "provider_connection",
+            target_id: Some(&target_id),
+            repository_id: None,
+            path: None,
+            reason: None,
+            outcome: "created",
+            correlation_id: None,
+            evidence_reference: Some(&input.external_installation_id),
+            payload: serde_json::json!({
+                "provider": &input.provider,
+                "secret_reference_present": true,
+            }),
+        },
+    )
+    .await?;
+    tx.commit().await?;
 
     Ok(Json(IdResponse { id }))
 }
@@ -227,7 +281,7 @@ async fn get_policy(
     .ok_or(ApiError::NotFound)?;
 
     Ok(Json(PolicyView {
-        version: row.get("version"),
+        version,
         protected_patterns: row.get("protected_patterns"),
         excluded_patterns: row.get("excluded_patterns"),
         required_lock: row.get("required_lock"),
@@ -269,6 +323,8 @@ async fn put_policy(
         }
     };
 
+    let organization_id = authz::repository_organization(&state.pool, repository_id).await?;
+    let mut tx = state.pool.begin().await?;
     let row = sqlx::query(
         "INSERT INTO lock_policies
             (repository_id, protected_patterns, excluded_patterns, required_lock,
@@ -291,8 +347,38 @@ async fn put_policy(
     .bind(input.required_lock)
     .bind(input.max_lock_age_minutes)
     .bind(input.force_unlock_approval_required)
-    .fetch_one(&state.pool)
+    .fetch_one(&mut *tx)
     .await?;
+
+    let version: i64 = row.get("version");
+    let target_id = repository_id.to_string();
+    audit::append_event(
+        &mut tx,
+        AuditEventInput {
+            organization_id,
+            actor_id: &identity.subject,
+            actor_type: "user",
+            action: "lock_policy.updated",
+            target_type: "repository",
+            target_id: Some(&target_id),
+            repository_id: Some(repository_id),
+            path: None,
+            reason: None,
+            outcome: "updated",
+            correlation_id: None,
+            evidence_reference: None,
+            payload: serde_json::json!({
+                "version": version,
+                "protected_patterns": &protected,
+                "excluded_patterns": &excluded,
+                "required_lock": input.required_lock,
+                "max_lock_age_minutes": input.max_lock_age_minutes,
+                "force_unlock_approval_required": input.force_unlock_approval_required,
+            }),
+        },
+    )
+    .await?;
+    tx.commit().await?;
 
     Ok(Json(PolicyView {
         version: row.get("version"),
@@ -386,6 +472,7 @@ async fn request_force_unlock(
         return Err(ApiError::BadRequest("reason is required".into()));
     }
 
+    let mut tx = state.pool.begin().await?;
     let id = sqlx::query_scalar::<_, Uuid>(
         "INSERT INTO force_unlock_requests
             (organization_id, repository_id, path, provider_lock_id, current_owner,
@@ -395,15 +482,41 @@ async fn request_force_unlock(
     )
     .bind(organization_id)
     .bind(repository_id)
-    .bind(input.path)
-    .bind(input.provider_lock_id)
-    .bind(input.current_owner)
+    .bind(&input.path)
+    .bind(&input.provider_lock_id)
+    .bind(&input.current_owner)
     .bind(requester)
-    .bind(input.reason)
-    .bind(input.linked_reference)
+    .bind(&input.reason)
+    .bind(&input.linked_reference)
     .bind(input.verified_at)
-    .fetch_one(&state.pool)
+    .fetch_one(&mut *tx)
     .await?;
+
+    let target_id = id.to_string();
+    audit::append_event(
+        &mut tx,
+        AuditEventInput {
+            organization_id,
+            actor_id: &identity.subject,
+            actor_type: "user",
+            action: "force_unlock.requested",
+            target_type: "force_unlock_request",
+            target_id: Some(&target_id),
+            repository_id: Some(repository_id),
+            path: Some(&input.path),
+            reason: Some(&input.reason),
+            outcome: "requested",
+            correlation_id: None,
+            evidence_reference: Some(&input.provider_lock_id),
+            payload: serde_json::json!({
+                "current_owner": &input.current_owner,
+                "linked_reference": &input.linked_reference,
+                "verified_at": input.verified_at,
+            }),
+        },
+    )
+    .await?;
+    tx.commit().await?;
 
     Ok(Json(IdResponse { id }))
 }
