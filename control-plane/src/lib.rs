@@ -3,6 +3,9 @@ pub mod authz;
 pub mod config;
 pub mod error;
 pub mod governance;
+pub mod force_unlock;
+pub mod stale;
+pub mod webhooks;
 pub mod routes;
 pub mod state;
 
