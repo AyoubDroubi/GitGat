@@ -8,7 +8,7 @@ use crate::{
 use axum::{
     Json, Router,
     extract::{Path, State},
-    routing::{get, post, put},
+    routing::{get, post},
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
