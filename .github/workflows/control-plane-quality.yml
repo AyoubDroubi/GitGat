@@ -11,6 +11,10 @@ on:
       - "control-plane/**"
       - ".github/workflows/control-plane-quality.yml"
 
+concurrency:
+  group: control-plane-quality-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
