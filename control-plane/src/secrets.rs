@@ -12,7 +12,9 @@ pub fn resolve_secret(reference: &str) -> Result<Vec<u8>, ApiError> {
             .chars()
             .all(|value| value.is_ascii_uppercase() || value.is_ascii_digit() || value == '_')
     {
-        return Err(ApiError::BadRequest("invalid secret environment reference".into()));
+        return Err(ApiError::BadRequest(
+            "invalid secret environment reference".into(),
+        ));
     }
     std::env::var(variable)
         .map(|value| value.into_bytes())
