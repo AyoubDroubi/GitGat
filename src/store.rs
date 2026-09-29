@@ -256,11 +256,7 @@ impl Catalog {
         }))
     }
 
-    pub fn update_managed_policy(
-        &self,
-        repository: &Path,
-        policy: &ManagedPolicy,
-    ) -> Result<()> {
+    pub fn update_managed_policy(&self, repository: &Path, policy: &ManagedPolicy) -> Result<()> {
         let repository = normalize_existing_path(repository);
         let policy_json = serde_json::to_string(policy)?;
         let changed = self.connection()?.execute(
