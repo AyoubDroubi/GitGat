@@ -1,4 +1,6 @@
+mod audit;
 mod authz;
+mod governance;
 mod config;
 mod error;
 mod routes;
