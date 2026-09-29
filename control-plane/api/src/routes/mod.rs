@@ -3,6 +3,7 @@ mod dashboard;
 mod health;
 mod meta;
 mod organizations;
+mod teams;
 
 use crate::state::AppState;
 use axum::{Router, middleware, routing::get};
@@ -18,6 +19,14 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/v1/organizations/{organization_id}/dashboard/summary",
             get(dashboard::summary),
+        )
+        .route(
+            "/api/v1/organizations/{organization_id}/teams",
+            get(teams::list),
+        )
+        .route(
+            "/api/v1/organizations/{organization_id}/teams/{team_id}/members",
+            get(teams::members),
         )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
