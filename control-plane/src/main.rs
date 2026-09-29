@@ -1,12 +1,16 @@
+mod authz;
 mod config;
 mod error;
-mod state;
 mod routes;
+mod state;
 
 use axum::Router;
 use config::Config;
 use state::AppState;
-use tower_http::{request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer}, trace::TraceLayer};
+use tower_http::{
+    request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
+    trace::TraceLayer,
+};
 use tracing::info;
 
 #[tokio::main]
@@ -30,7 +34,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let listener = tokio::net::TcpListener::bind(&config.bind).await?;
     info!(bind = %config.bind, "GitGat Control Plane listening");
-    axum::serve(listener, app).with_graceful_shutdown(shutdown()).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown())
+        .await?;
     Ok(())
 }
 

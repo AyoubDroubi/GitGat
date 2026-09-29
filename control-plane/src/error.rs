@@ -1,4 +1,8 @@
-use axum::{http::StatusCode, response::{IntoResponse, Response}, Json};
+use axum::{
+    Json,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use serde::Serialize;
 
 #[derive(Debug, thiserror::Error)]
@@ -7,6 +11,8 @@ pub enum ApiError {
     Database(#[from] sqlx::Error),
     #[error("resource not found")]
     NotFound,
+    #[error("forbidden")]
+    Forbidden,
 }
 
 #[derive(Serialize)]
@@ -20,7 +26,15 @@ impl IntoResponse for ApiError {
         let (status, code) = match self {
             Self::Database(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal.database"),
             Self::NotFound => (StatusCode::NOT_FOUND, "common.not_found"),
+            Self::Forbidden => (StatusCode::FORBIDDEN, "auth.forbidden"),
         };
-        (status, Json(ErrorBody { code, message: self.to_string() })).into_response()
+        (
+            status,
+            Json(ErrorBody {
+                code,
+                message: self.to_string(),
+            }),
+        )
+            .into_response()
     }
 }
