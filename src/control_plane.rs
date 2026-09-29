@@ -37,9 +37,16 @@ impl ControlPlaneClient {
         if repository_id.is_empty() {
             bail!("Control Plane repository ID is required");
         }
-        let url = format!("{}/api/v1/repositories/{repository_id}/policy", self.base_url);
+        let url = format!(
+            "{}/api/v1/repositories/{repository_id}/policy",
+            self.base_url
+        );
         let mut request = self.client.get(url);
-        if let Some(token) = self.bearer_token.as_deref().filter(|value| !value.is_empty()) {
+        if let Some(token) = self
+            .bearer_token
+            .as_deref()
+            .filter(|value| !value.is_empty())
+        {
             request = request.bearer_auth(token);
         }
         request
@@ -84,7 +91,13 @@ mod tests {
             policy_fetched_unix: Some(1000),
         };
 
-        assert!(managed.policy_is_fresh_at(1000 + POLICY_CACHE_MAX_AGE_SECONDS, POLICY_CACHE_MAX_AGE_SECONDS));
-        assert!(!managed.policy_is_fresh_at(1001 + POLICY_CACHE_MAX_AGE_SECONDS, POLICY_CACHE_MAX_AGE_SECONDS));
+        assert!(managed.policy_is_fresh_at(
+            1000 + POLICY_CACHE_MAX_AGE_SECONDS,
+            POLICY_CACHE_MAX_AGE_SECONDS
+        ));
+        assert!(!managed.policy_is_fresh_at(
+            1001 + POLICY_CACHE_MAX_AGE_SECONDS,
+            POLICY_CACHE_MAX_AGE_SECONDS
+        ));
     }
 }
