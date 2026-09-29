@@ -1,3 +1,4 @@
+use crate::control_plane::{ControlPlaneClient, POLICY_CACHE_MAX_AGE_SECONDS};
 use crate::domain::{ForgeSnapshot, LfsLockOwnership, RepositorySnapshot};
 use crate::forge::ForgeClient;
 use crate::git::{ConflictChoice, GitClient, ResetMode};
@@ -6,6 +7,7 @@ use anyhow::Result;
 use eframe::egui::{self, Key, RichText, ScrollArea, TextEdit};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Tab {
@@ -88,6 +90,9 @@ pub struct GitGatApp {
     output_text: String,
     notice: String,
     history_limit: usize,
+    control_plane_url: String,
+    control_plane_repository_id: String,
+    control_plane_token: String,
 }
 
 impl GitGatApp {
@@ -127,6 +132,9 @@ impl GitGatApp {
             output_text: String::new(),
             notice: String::from("Open or clone a repository to begin."),
             history_limit: 100,
+            control_plane_url: String::new(),
+            control_plane_repository_id: String::new(),
+            control_plane_token: String::new(),
         }
     }
 
@@ -147,8 +155,21 @@ impl GitGatApp {
                     return;
                 }
                 self.repository_input = root.to_string_lossy().to_string();
-                self.repository = Some(root);
+                self.repository = Some(root.clone());
                 self.selected_paths.clear();
+                match self.catalog.managed_repository(&root) {
+                    Ok(Some(managed)) => {
+                        self.control_plane_url = managed.control_plane_url;
+                        self.control_plane_repository_id = managed.control_plane_repository_id;
+                    }
+                    Ok(None) => {
+                        self.control_plane_url.clear();
+                        self.control_plane_repository_id.clear();
+                    }
+                    Err(error) => {
+                        self.notice = error.to_string();
+                    }
+                }
                 self.refresh_git();
             }
             Err(error) => self.notice = format!("Not a Git repository: {error}"),
@@ -1097,6 +1118,108 @@ impl GitGatApp {
             });
         } else {
             ui.weak("Open a repository to detect and configure its forge provider.");
+        }
+        ui.separator();
+        ui.heading("Organization governance");
+        ui.weak(
+            "Managed repositories use Control Plane policy. The access token stays in memory only and is never persisted.",
+        );
+        if let Some(repo) = self.current_repo() {
+            ui.add(
+                TextEdit::singleline(&mut self.control_plane_url)
+                    .hint_text("https://control.gitgat.example"),
+            );
+            ui.add(
+                TextEdit::singleline(&mut self.control_plane_repository_id)
+                    .hint_text("Control Plane repository ID"),
+            );
+            ui.add(
+                TextEdit::singleline(&mut self.control_plane_token)
+                    .password(true)
+                    .hint_text("Short-lived SSO access token"),
+            );
+
+            match self.catalog.managed_repository(&repo) {
+                Ok(Some(managed)) => {
+                    let now = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs() as i64;
+                    let fresh =
+                        managed.policy_is_fresh_at(now, POLICY_CACHE_MAX_AGE_SECONDS);
+                    if let Some(policy) = managed.policy {
+                        ui.label(format!(
+                            "Managed policy v{} • {}",
+                            policy.version,
+                            if fresh { "fresh" } else { "stale" }
+                        ));
+                    } else {
+                        ui.label("Managed repository • policy not fetched yet");
+                    }
+                }
+                Ok(None) => {
+                    ui.label("Standalone repository");
+                }
+                Err(error) => {
+                    ui.label(error.to_string());
+                }
+            }
+
+            ui.horizontal(|ui| {
+                if ui.button("Manage repository").clicked() {
+                    match self.catalog.set_managed_repository(
+                        &repo,
+                        self.control_plane_url.trim(),
+                        self.control_plane_repository_id.trim(),
+                    ) {
+                        Ok(()) => {
+                            self.notice =
+                                "Repository marked as organization-managed. Refresh policy before protected mutations."
+                                    .to_owned();
+                        }
+                        Err(error) => self.notice = error.to_string(),
+                    }
+                }
+
+                if ui.button("Refresh managed policy").clicked() {
+                    match self.catalog.managed_repository(&repo) {
+                        Ok(Some(managed)) => match ControlPlaneClient::new(
+                            managed.control_plane_url.clone(),
+                            (!self.control_plane_token.trim().is_empty())
+                                .then(|| self.control_plane_token.trim().to_owned()),
+                        ) {
+                            Ok(client) => match client.refresh_policy(&self.catalog, &repo, &managed) {
+                                Ok(policy) => {
+                                    self.notice =
+                                        format!("Managed policy v{} refreshed.", policy.version);
+                                }
+                                Err(error) => self.notice = error.to_string(),
+                            },
+                            Err(error) => self.notice = error.to_string(),
+                        },
+                        Ok(None) => {
+                            self.notice =
+                                "Mark this repository as managed before refreshing policy."
+                                    .to_owned();
+                        }
+                        Err(error) => self.notice = error.to_string(),
+                    }
+                }
+
+                if ui.button("Return to standalone").clicked() {
+                    match self.catalog.clear_managed_repository(&repo) {
+                        Ok(()) => {
+                            self.control_plane_url.clear();
+                            self.control_plane_repository_id.clear();
+                            self.control_plane_token.clear();
+                            self.notice = "Organization management removed locally.".to_owned();
+                        }
+                        Err(error) => self.notice = error.to_string(),
+                    }
+                }
+            });
+        } else {
+            ui.weak("Open a repository to configure organization governance.");
         }
         ui.separator();
         ui.heading("Relocate moved repository");
