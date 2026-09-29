@@ -2,7 +2,7 @@ FROM rust:1.95-bookworm AS build
 WORKDIR /src
 COPY control-plane ./control-plane
 WORKDIR /src/control-plane
-RUN cargo build --locked --release
+RUN cargo build --release
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl     && rm -rf /var/lib/apt/lists/*
