@@ -396,12 +396,10 @@ pub async fn current_user_id(
     state: &AppState,
     identity: &AuthIdentity,
 ) -> Result<Uuid, IdentityLookupError> {
-    sqlx::query_scalar::<_, Uuid>(
-        "SELECT id FROM users WHERE subject = $1 AND disabled_at IS NULL",
-    )
-    .bind(&identity.subject)
-    .fetch_optional(&state.database)
-    .await
+    sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE subject = $1 AND disabled_at IS NULL")
+        .bind(&identity.subject)
+        .fetch_optional(&state.database)
+        .await
         .map_err(IdentityLookupError::Database)?
         .ok_or(IdentityLookupError::NotProvisioned)
 }
