@@ -1,6 +1,6 @@
 use crate::{
     admin_api, auth::AuthenticatedIdentity, error::ApiError, operations_api, privileged_api,
-    state::AppState,
+    state::AppState, webhook_api,
 };
 use axum::{Json, Router, extract::State, response::Html, routing::get};
 use serde::Serialize;
@@ -17,6 +17,7 @@ pub fn router() -> Router<AppState> {
         .route("/admin", get(admin))
         .route("/health", get(health))
         .route("/ready", get(ready))
+        .merge(webhook_api::router())
         .nest(
             "/api/v1",
             Router::new()
