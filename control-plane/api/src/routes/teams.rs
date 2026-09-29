@@ -2,7 +2,8 @@ use crate::{
     auth::AuthIdentity,
     rbac::{Permission, require_permission},
     routes::organizations::{
-        access_error, conflict, current_user_id, database_error, not_found, validation_error,
+        access_error, conflict, current_user_id, database_error, identity_lookup_error, not_found,
+        validation_error,
     },
     state::AppState,
 };
@@ -118,7 +119,7 @@ pub async fn create(
 
     let actor_user_id = match current_user_id(&state, &identity).await {
         Ok(value) => value,
-        Err(response) => return response,
+        Err(error) => return identity_lookup_error(error),
     };
 
     let mut transaction = match state.database.begin().await {
@@ -276,7 +277,7 @@ pub async fn upsert_member(
 
     let actor_user_id = match current_user_id(&state, &identity).await {
         Ok(value) => value,
-        Err(response) => return response,
+        Err(error) => return identity_lookup_error(error),
     };
 
     let mut transaction = match state.database.begin().await {
@@ -363,7 +364,7 @@ pub async fn remove_member(
 
     let actor_user_id = match current_user_id(&state, &identity).await {
         Ok(value) => value,
-        Err(response) => return response,
+        Err(error) => return identity_lookup_error(error),
     };
 
     let mut transaction = match state.database.begin().await {
