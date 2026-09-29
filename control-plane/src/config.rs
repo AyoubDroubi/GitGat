@@ -9,8 +9,7 @@ impl Config {
     pub fn from_env() -> Result<Self, std::env::VarError> {
         Ok(Self {
             database_url: std::env::var("DATABASE_URL")?,
-            bind: std::env::var("GITGAT_BIND")
-                .unwrap_or_else(|_| "127.0.0.1:8080".to_owned()),
+            bind: std::env::var("GITGAT_BIND").unwrap_or_else(|_| "127.0.0.1:8080".to_owned()),
             auth_proxy_secret: std::env::var("GITGAT_AUTH_PROXY_SECRET").ok(),
         })
     }
