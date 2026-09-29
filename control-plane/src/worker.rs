@@ -3,6 +3,12 @@ use sqlx::{PgPool, Row};
 use tokio::time::{Duration, sleep};
 use uuid::Uuid;
 
+const MAX_ATTEMPTS: i32 = 5;
+
+fn should_dead_letter(attempts: i32) -> bool {
+    attempts >= MAX_ATTEMPTS
+}
+
 pub async fn run(pool: PgPool) {
     loop {
         match process_one(&pool).await {
@@ -137,7 +143,7 @@ async fn fail_job(
     attempts: i32,
     error: &str,
 ) -> Result<(), sqlx::Error> {
-    if attempts >= 5 {
+    if should_dead_letter(attempts) {
         sqlx::query(
             "UPDATE background_jobs
              SET status = 'dead_letter', last_error = $2, updated_at = now()
@@ -168,8 +174,11 @@ async fn fail_job(
 
 #[cfg(test)]
 mod tests {
+    use super::should_dead_letter;
+
     #[test]
-    fn retry_policy_is_bounded_by_dead_letter_threshold() {
-        assert!(5 >= 5);
+    fn retry_policy_dead_letters_after_five_attempts() {
+        assert!(!should_dead_letter(4));
+        assert!(should_dead_letter(5));
     }
 }
