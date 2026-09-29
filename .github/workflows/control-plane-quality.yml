@@ -17,6 +17,22 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: gitgat
+          POSTGRES_PASSWORD: gitgat
+          POSTGRES_DB: gitgat_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gitgat -d gitgat_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://gitgat:gitgat@localhost:5432/gitgat_test
     defaults:
       run:
         working-directory: control-plane
@@ -32,3 +48,17 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --all-targets --all-features -- -D warnings
       - run: cargo test --all-targets --all-features
+      - name: Prove migrations against PostgreSQL
+        run: |
+          cargo run >/tmp/gitgat-control-plane.log 2>&1 &
+          pid=$!
+          trap 'kill $pid 2>/dev/null || true' EXIT
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8080/ready >/dev/null; then
+              curl --fail --silent http://127.0.0.1:8080/api/v1/governance/summary
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/gitgat-control-plane.log
+          exit 1
