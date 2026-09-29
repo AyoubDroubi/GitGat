@@ -9,8 +9,10 @@ pub mod governance;
 pub mod operations_api;
 pub mod privileged_api;
 pub mod routes;
+pub mod secrets;
 pub mod stale;
 pub mod state;
+pub mod webhook_api;
 pub mod webhooks;
 
 use axum::{
