@@ -1,4 +1,4 @@
-use crate::domain::{CatalogRepository, Workspace};
+use crate::domain::{CatalogRepository, ManagedPolicy, ManagedRepository, Workspace};
 use anyhow::{Context, Result};
 use rusqlite::{Connection, params};
 use std::path::{Path, PathBuf};
@@ -60,6 +60,13 @@ impl Catalog {
                operation TEXT NOT NULL,
                details TEXT NOT NULL,
                created_unix INTEGER NOT NULL
+             );
+             CREATE TABLE IF NOT EXISTS managed_repositories(
+               repository_path TEXT PRIMARY KEY NOT NULL,
+               control_plane_url TEXT NOT NULL,
+               control_plane_repository_id TEXT NOT NULL,
+               policy_json TEXT,
+               policy_fetched_unix INTEGER
              );",
         )?;
         Ok(())
@@ -194,6 +201,87 @@ impl Catalog {
             });
         }
         Ok(result)
+    }
+
+    pub fn set_managed_repository(
+        &self,
+        repository: &Path,
+        control_plane_url: &str,
+        control_plane_repository_id: &str,
+    ) -> Result<()> {
+        let repository = normalize_existing_path(repository);
+        if control_plane_url.trim().is_empty() || control_plane_repository_id.trim().is_empty() {
+            anyhow::bail!("Control Plane URL and repository ID are required");
+        }
+        self.connection()?.execute(
+            "INSERT INTO managed_repositories(
+                repository_path,control_plane_url,control_plane_repository_id,policy_json,policy_fetched_unix
+             ) VALUES(?1,?2,?3,NULL,NULL)
+             ON CONFLICT(repository_path) DO UPDATE SET
+                control_plane_url=excluded.control_plane_url,
+                control_plane_repository_id=excluded.control_plane_repository_id,
+                policy_json=NULL,
+                policy_fetched_unix=NULL",
+            params![
+                repository.to_string_lossy(),
+                control_plane_url.trim(),
+                control_plane_repository_id.trim()
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn managed_repository(&self, repository: &Path) -> Result<Option<ManagedRepository>> {
+        let repository = normalize_existing_path(repository);
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
+            "SELECT control_plane_url,control_plane_repository_id,policy_json,policy_fetched_unix
+             FROM managed_repositories WHERE repository_path=?1",
+        )?;
+        let mut rows = statement.query(params![repository.to_string_lossy()])?;
+        let Some(row) = rows.next()? else {
+            return Ok(None);
+        };
+        let policy_json: Option<String> = row.get(2)?;
+        let policy = policy_json
+            .as_deref()
+            .map(serde_json::from_str::<ManagedPolicy>)
+            .transpose()
+            .context("managed policy cache is invalid")?;
+        Ok(Some(ManagedRepository {
+            control_plane_url: row.get(0)?,
+            control_plane_repository_id: row.get(1)?,
+            policy,
+            policy_fetched_unix: row.get(3)?,
+        }))
+    }
+
+    pub fn update_managed_policy(
+        &self,
+        repository: &Path,
+        policy: &ManagedPolicy,
+    ) -> Result<()> {
+        let repository = normalize_existing_path(repository);
+        let policy_json = serde_json::to_string(policy)?;
+        let changed = self.connection()?.execute(
+            "UPDATE managed_repositories
+             SET policy_json=?2,policy_fetched_unix=?3
+             WHERE repository_path=?1",
+            params![repository.to_string_lossy(), policy_json, now_unix()],
+        )?;
+        if changed == 0 {
+            anyhow::bail!("repository is not enrolled as organization-managed");
+        }
+        Ok(())
+    }
+
+    pub fn clear_managed_repository(&self, repository: &Path) -> Result<()> {
+        let repository = normalize_existing_path(repository);
+        self.connection()?.execute(
+            "DELETE FROM managed_repositories WHERE repository_path=?1",
+            params![repository.to_string_lossy()],
+        )?;
+        Ok(())
     }
 
     pub fn journal(&self, repository: &Path, operation: &str, details: &str) -> Result<()> {
