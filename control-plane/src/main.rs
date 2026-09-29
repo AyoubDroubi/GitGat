@@ -11,6 +11,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::from_env()?;
     let pool = sqlx::PgPool::connect(&config.database_url).await?;
     sqlx::migrate!().run(&pool).await?;
+    tokio::spawn(gitgat_control_plane::worker::run(pool.clone()));
     let app = app(AppState::new(pool, config.auth_proxy_secret));
 
     let listener = tokio::net::TcpListener::bind(&config.bind).await?;
