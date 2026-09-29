@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>GitGat Control Plane</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    body { margin:0; background:#0b0d10; color:#eef2f6; }
+    header { padding:20px 28px; border-bottom:1px solid #232933; display:flex; justify-content:space-between; align-items:center; }
+    main { padding:28px; max-width:1200px; margin:auto; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; }
+    .card { background:#12161c; border:1px solid #252c36; border-radius:16px; padding:18px; }
+    .muted { color:#9aa7b5; }
+    .badge { border:1px solid #384452; padding:5px 9px; border-radius:999px; font-size:12px; }
+  </style>
+</head>
+<body>
+<header><strong>GitGat Control Plane</strong><span class="badge">Governance, not lock authority</span></header>
+<main>
+  <h1>Organization governance</h1>
+  <p class="muted">Git LFS providers remain the source of truth for active locks.</p>
+  <section class="grid">
+    <div class="card"><h3>Repositories</h3><p>Enrollment, provider health and enforcement mode.</p></div>
+    <div class="card"><h3>Lock policies</h3><p>Protected patterns, drift and rollout state.</p></div>
+    <div class="card"><h3>Active locks</h3><p>Provider-verified observations with freshness.</p></div>
+    <div class="card"><h3>Force unlock</h3><p>Approval workflow with live revalidation.</p></div>
+    <div class="card"><h3>Audit</h3><p>Append-oriented compliance history.</p></div>
+    <div class="card"><h3>Provider health</h3><p>GitHub and Azure DevOps integration status.</p></div>
+  </section>
+</main>
+</body>
+</html>
