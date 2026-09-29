@@ -402,8 +402,8 @@ pub async fn current_user_id(
     .bind(&identity.subject)
     .fetch_optional(&state.database)
     .await
-    .map_err(IdentityLookupError::Database)?
-    .ok_or(IdentityLookupError::NotProvisioned)
+        .map_err(IdentityLookupError::Database)?
+        .ok_or(IdentityLookupError::NotProvisioned)
 }
 
 pub fn identity_lookup_error(error: IdentityLookupError) -> Response {
