@@ -6,6 +6,7 @@ pub mod config;
 pub mod error;
 pub mod force_unlock;
 pub mod governance;
+pub mod operations_api;
 pub mod privileged_api;
 pub mod routes;
 pub mod stale;
