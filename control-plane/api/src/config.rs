@@ -21,7 +21,7 @@ impl Config {
                 "GITGAT_DATABASE_URL is required",
             )
         })?;
-        let bind = std::env::var("GITGAT_BIND")
+        let bind: SocketAddr = std::env::var("GITGAT_BIND")
             .unwrap_or_else(|_| "127.0.0.1:8080".to_owned())
             .parse()?;
         let database_max_connections = std::env::var("GITGAT_DATABASE_MAX_CONNECTIONS")
