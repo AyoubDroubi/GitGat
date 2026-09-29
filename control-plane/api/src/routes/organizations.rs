@@ -334,7 +334,7 @@ pub async fn update_member_role(
 
     let actor_user_id = match current_user_id(&state, &identity).await {
         Ok(value) => value,
-        Err(response) => return response,
+        Err(error) => return identity_lookup_error(error),
     };
 
     let mut transaction = match state.database.begin().await {
@@ -384,20 +384,35 @@ pub async fn update_member_role(
     StatusCode::NO_CONTENT.into_response()
 }
 
-pub async fn current_user_id(state: &AppState, identity: &AuthIdentity) -> Result<Uuid, Response> {
-    match sqlx::query_scalar::<_, Uuid>(
+#[derive(Debug, thiserror::Error)]
+pub enum IdentityLookupError {
+    #[error("authenticated identity is not provisioned")]
+    NotProvisioned,
+    #[error("database error: {0}")]
+    Database(#[from] sqlx::Error),
+}
+
+pub async fn current_user_id(
+    state: &AppState,
+    identity: &AuthIdentity,
+) -> Result<Uuid, IdentityLookupError> {
+    sqlx::query_scalar::<_, Uuid>(
         "SELECT id FROM users WHERE subject = $1 AND disabled_at IS NULL",
     )
     .bind(&identity.subject)
     .fetch_optional(&state.database)
     .await
-    {
-        Ok(Some(value)) => Ok(value),
-        Ok(None) => Err(forbidden(
+    .map_err(IdentityLookupError::Database)?
+    .ok_or(IdentityLookupError::NotProvisioned)
+}
+
+pub fn identity_lookup_error(error: IdentityLookupError) -> Response {
+    match error {
+        IdentityLookupError::NotProvisioned => forbidden(
             "identity.not_provisioned",
             "The authenticated identity is not provisioned.",
-        )),
-        Err(error) => Err(database_error(error)),
+        ),
+        IdentityLookupError::Database(error) => database_error(error),
     }
 }
 
