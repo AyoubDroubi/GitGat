@@ -46,9 +46,10 @@ async fn summary(State(state): State<AppState>) -> Result<Json<GovernanceSummary
     let organizations = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM organizations")
         .fetch_one(&state.pool)
         .await?;
-    let repositories = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM repository_registrations")
-        .fetch_one(&state.pool)
-        .await?;
+    let repositories =
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM repository_registrations")
+            .fetch_one(&state.pool)
+            .await?;
     let policies = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM lock_policies")
         .fetch_one(&state.pool)
         .await?;
