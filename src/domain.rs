@@ -167,7 +167,6 @@ pub struct ForgeSnapshot {
     pub activity: Vec<ActivityInfo>,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ManagedPolicy {
     pub version: i64,
