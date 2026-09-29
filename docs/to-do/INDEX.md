@@ -27,7 +27,7 @@ Production: reserved and untouched
 | RUST-016 | Forge provider abstraction (GitHub/Azure DevOps) | IN PROGRESS | implementation present; quality/regression gate pending |
 | RUST-017 | Azure DevOps Repos/PRs/Pipelines integration | IN PROGRESS | implementation present; authenticated Azure live E2E pending |
 | RUST-018 | Provider-side required lock-policy check before merge | IN PROGRESS | policy engine + GitHub workflow + Azure template; live required-policy gates pending |
-| RUST-019 | GitGat Control Plane / admin portal foundation | TODO | API + PostgreSQL + admin UI foundation |
+| RUST-019 | GitGat Control Plane / admin portal foundation | IN PROGRESS | Rust API + PostgreSQL foundation implemented; admin UI/integration evidence pending |
 | RUST-020 | Identity, organizations, teams and RBAC | TODO | tenant isolation + permission tests |
 | RUST-021 | Repository enrollment, provider connections and webhooks | TODO | live enrollment + signed webhook E2E |
 | RUST-022 | Lock policy and protected-pattern management | TODO | policy CRUD + drift/reconciliation PR |
