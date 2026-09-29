@@ -1,8 +1,5 @@
 use crate::{
-    error::ApiError,
-    secrets::resolve_secret,
-    state::AppState,
-    webhooks::verify_sha256_signature,
+    error::ApiError, secrets::resolve_secret, state::AppState, webhooks::verify_sha256_signature,
 };
 use axum::{
     Json, Router,
@@ -117,14 +114,12 @@ async fn ingest(
 fn extract_repository_id(provider: &str, payload: &[u8]) -> Option<String> {
     let json: serde_json::Value = serde_json::from_slice(payload).ok()?;
     match provider {
-        "github" => json
-            .pointer("/repository/id")
-            .and_then(|value| {
-                value
-                    .as_u64()
-                    .map(|id| id.to_string())
-                    .or_else(|| value.as_str().map(str::to_owned))
-            }),
+        "github" => json.pointer("/repository/id").and_then(|value| {
+            value
+                .as_u64()
+                .map(|id| id.to_string())
+                .or_else(|| value.as_str().map(str::to_owned))
+        }),
         "azure_devops" => json
             .pointer("/resource/repository/id")
             .and_then(serde_json::Value::as_str)
