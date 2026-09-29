@@ -1,13 +1,15 @@
+pub mod admin_api;
 pub mod audit;
+pub mod auth;
 pub mod authz;
 pub mod config;
 pub mod error;
-pub mod governance;
 pub mod force_unlock;
-pub mod stale;
-pub mod webhooks;
+pub mod governance;
 pub mod routes;
+pub mod stale;
 pub mod state;
+pub mod webhooks;
 
 use axum::Router;
 use state::AppState;
