@@ -166,3 +166,31 @@ pub struct ForgeSnapshot {
     pub notifications: Vec<NotificationInfo>,
     pub activity: Vec<ActivityInfo>,
 }
+
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ManagedPolicy {
+    pub version: i64,
+    pub protected_patterns: Vec<String>,
+    pub excluded_patterns: Vec<String>,
+    pub required_lock: bool,
+    pub max_lock_age_minutes: Option<i64>,
+    pub force_unlock_approval_required: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ManagedRepository {
+    pub control_plane_url: String,
+    pub control_plane_repository_id: String,
+    pub policy: Option<ManagedPolicy>,
+    pub policy_fetched_unix: Option<i64>,
+}
+
+impl ManagedRepository {
+    pub fn policy_is_fresh_at(&self, now_unix: i64, max_age_seconds: i64) -> bool {
+        self.policy.is_some()
+            && self
+                .policy_fetched_unix
+                .is_some_and(|fetched| now_unix >= fetched && now_unix - fetched <= max_age_seconds)
+    }
+}
