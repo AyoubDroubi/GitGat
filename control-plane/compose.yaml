@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: gitgat
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: gitgat
+    volumes:
+      - gitgat-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gitgat -d gitgat"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  control-plane:
+    build:
+      context: ..
+      dockerfile: control-plane/Dockerfile
+    environment:
+      DATABASE_URL: postgres://gitgat:${POSTGRES_PASSWORD}@postgres:5432/gitgat
+      GITGAT_BIND: 0.0.0.0:8080
+      GITGAT_AUTH_PROXY_SECRET: ${GITGAT_AUTH_PROXY_SECRET:?set GITGAT_AUTH_PROXY_SECRET}
+      RUST_LOG: gitgat_control_plane=info,tower_http=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  gitgat-postgres:
