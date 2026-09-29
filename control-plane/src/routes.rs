@@ -1,4 +1,7 @@
-use crate::{admin_api, error::ApiError, operations_api, privileged_api, state::AppState};
+use crate::{
+    admin_api, auth::AuthenticatedIdentity, error::ApiError, operations_api, privileged_api,
+    state::AppState,
+};
 use axum::{Json, Router, extract::State, response::Html, routing::get};
 use serde::Serialize;
 
@@ -56,17 +59,43 @@ struct GovernanceSummary {
     policies: i64,
 }
 
-async fn summary(State(state): State<AppState>) -> Result<Json<GovernanceSummary>, ApiError> {
-    let organizations = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM organizations")
-        .fetch_one(&state.pool)
-        .await?;
-    let repositories =
-        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM repository_registrations")
-            .fetch_one(&state.pool)
-            .await?;
-    let policies = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM lock_policies")
-        .fetch_one(&state.pool)
-        .await?;
+async fn summary(
+    State(state): State<AppState>,
+    identity: AuthenticatedIdentity,
+) -> Result<Json<GovernanceSummary>, ApiError> {
+    let organizations = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*)
+         FROM memberships m
+         JOIN users u ON u.id = m.user_id
+         WHERE u.external_subject = $1",
+    )
+    .bind(&identity.subject)
+    .fetch_one(&state.pool)
+    .await?;
+
+    let repositories = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*)
+         FROM repository_registrations r
+         JOIN memberships m ON m.organization_id = r.organization_id
+         JOIN users u ON u.id = m.user_id
+         WHERE u.external_subject = $1",
+    )
+    .bind(&identity.subject)
+    .fetch_one(&state.pool)
+    .await?;
+
+    let policies = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*)
+         FROM lock_policies p
+         JOIN repository_registrations r ON r.id = p.repository_id
+         JOIN memberships m ON m.organization_id = r.organization_id
+         JOIN users u ON u.id = m.user_id
+         WHERE u.external_subject = $1",
+    )
+    .bind(&identity.subject)
+    .fetch_one(&state.pool)
+    .await?;
+
     Ok(Json(GovernanceSummary {
         organizations,
         repositories,
