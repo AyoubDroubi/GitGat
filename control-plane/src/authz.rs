@@ -29,26 +29,60 @@ impl Role {
         use Permission::*;
         match self {
             Self::OrganizationOwner => [
-                ViewRepositories, ManageEnrollment, ManageProtectedPatterns, ViewActiveLocks,
-                RequestForceUnlock, ApproveForceUnlock, ManageExceptions, ViewAudit,
-                ManageProviderConnections, ManageMembers,
-            ].into_iter().collect(),
+                ViewRepositories,
+                ManageEnrollment,
+                ManageProtectedPatterns,
+                ViewActiveLocks,
+                RequestForceUnlock,
+                ApproveForceUnlock,
+                ManageExceptions,
+                ViewAudit,
+                ManageProviderConnections,
+                ManageMembers,
+            ]
+            .into_iter()
+            .collect(),
             Self::OrganizationAdmin => [
-                ViewRepositories, ManageEnrollment, ManageProtectedPatterns, ViewActiveLocks,
-                RequestForceUnlock, ApproveForceUnlock, ManageExceptions, ViewAudit,
-                ManageProviderConnections, ManageMembers,
-            ].into_iter().collect(),
+                ViewRepositories,
+                ManageEnrollment,
+                ManageProtectedPatterns,
+                ViewActiveLocks,
+                RequestForceUnlock,
+                ApproveForceUnlock,
+                ManageExceptions,
+                ViewAudit,
+                ManageProviderConnections,
+                ManageMembers,
+            ]
+            .into_iter()
+            .collect(),
             Self::RepositoryAdmin => [
-                ViewRepositories, ManageEnrollment, ManageProtectedPatterns, ViewActiveLocks,
-                RequestForceUnlock, ApproveForceUnlock, ManageExceptions, ViewAudit,
-            ].into_iter().collect(),
+                ViewRepositories,
+                ManageEnrollment,
+                ManageProtectedPatterns,
+                ViewActiveLocks,
+                RequestForceUnlock,
+                ApproveForceUnlock,
+                ManageExceptions,
+                ViewAudit,
+            ]
+            .into_iter()
+            .collect(),
             Self::TeamLead => [
-                ViewRepositories, ViewActiveLocks, RequestForceUnlock, ApproveForceUnlock, ViewAudit,
-            ].into_iter().collect(),
-            Self::Developer => [
-                ViewRepositories, ViewActiveLocks, RequestForceUnlock,
-            ].into_iter().collect(),
-            Self::Auditor => [ViewRepositories, ViewActiveLocks, ViewAudit].into_iter().collect(),
+                ViewRepositories,
+                ViewActiveLocks,
+                RequestForceUnlock,
+                ApproveForceUnlock,
+                ViewAudit,
+            ]
+            .into_iter()
+            .collect(),
+            Self::Developer => [ViewRepositories, ViewActiveLocks, RequestForceUnlock]
+                .into_iter()
+                .collect(),
+            Self::Auditor => [ViewRepositories, ViewActiveLocks, ViewAudit]
+                .into_iter()
+                .collect(),
         }
     }
 
