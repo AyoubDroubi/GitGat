@@ -14,6 +14,7 @@ pub mod stale;
 pub mod state;
 pub mod webhook_api;
 pub mod webhooks;
+pub mod worker;
 
 use axum::{
     Router,
