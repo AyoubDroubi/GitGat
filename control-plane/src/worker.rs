@@ -102,8 +102,7 @@ async fn process_webhook(
 
     if let (Some(organization_id), Some(provider), Some(repository_external_id)) =
         (organization_id, provider, repository_external_id)
-    {
-        if let Some(repository_id) = sqlx::query_scalar::<_, Uuid>(
+        && let Some(repository_id) = sqlx::query_scalar::<_, Uuid>(
             "SELECT id
              FROM repository_registrations
              WHERE organization_id = $1
@@ -115,7 +114,7 @@ async fn process_webhook(
         .bind(repository_external_id)
         .fetch_optional(pool)
         .await?
-        {
+    {
             let dedupe_key = format!("reconcile:{repository_id}");
             sqlx::query(
                 "INSERT INTO background_jobs
