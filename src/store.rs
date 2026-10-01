@@ -372,7 +372,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn persists_managed_repository_without_persisting_session_tokens() {
         use crate::domain::ManagedPolicy;
 
@@ -412,6 +411,7 @@ mod tests {
         assert!(catalog.managed_repository(&repo).unwrap().is_none());
     }
 
+    #[test]
     fn relocates_missing_repository_and_workspace_membership() {
         let root = tempdir().unwrap();
         let old = root.path().join("old-repo");
